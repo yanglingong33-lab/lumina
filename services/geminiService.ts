@@ -1,7 +1,19 @@
 import { GoogleGenAI } from "@google/genai";
 import { DesignConfig, GenerationResult } from "../types";
 
-const GEMINI_API_KEY = process.env.API_KEY || '';
+// Safely access environment variables without crashing in browser environments
+const getApiKey = () => {
+  try {
+    if (typeof process !== 'undefined' && process.env) {
+      return process.env.API_KEY || '';
+    }
+  } catch (e) {
+    // Ignore reference errors
+  }
+  return '';
+};
+
+const GEMINI_API_KEY = getApiKey();
 
 // Initialize the client
 const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
@@ -14,7 +26,7 @@ export const generateJewelryDesign = async (
   config: DesignConfig
 ): Promise<GenerationResult> => {
   if (!GEMINI_API_KEY) {
-    throw new Error("API Key is missing. Please check your environment variables.");
+    throw new Error("API Key 未配置。请在 Vercel 设置中添加名为 'API_KEY' 的环境变量。");
   }
 
   // Extract mime type and clean base64 data
@@ -89,7 +101,7 @@ export const generateJewelryDesign = async (
     }
 
     if (!image) {
-      throw new Error("生成失败，未返回图片数据。");
+      throw new Error("生成失败，API 未返回图片数据。请重试。");
     }
 
     return {
@@ -97,8 +109,12 @@ export const generateJewelryDesign = async (
       description: description.trim()
     };
 
-  } catch (error) {
+  } catch (error: any) {
     console.error("Gemini Generation Error:", error);
+    // Improve error message for user
+    if (error.message?.includes('API key')) {
+      throw new Error("API Key 无效或未配置。请检查环境变量。");
+    }
     throw error;
   }
 };
