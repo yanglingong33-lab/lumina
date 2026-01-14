@@ -1,18 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { DesignConfig, GenerationResult } from "../types";
 
-// With the updated Vite config, process.env.API_KEY is replaced by the string literal.
-// We access it directly.
-const getApiKey = () => {
-  // @ts-ignore - Process might be technically undefined in types, but replaced by Vite build
-  return process.env.API_KEY || '';
-};
-
-// Initialize the client helper
-const initAI = (key: string) => {
-  return new GoogleGenAI({ apiKey: key });
-};
-
 /**
  * Generates a jewelry design based on an input image and configuration.
  */
@@ -20,14 +8,10 @@ export const generateJewelryDesign = async (
   base64Image: string,
   config: DesignConfig
 ): Promise<GenerationResult> => {
-  const apiKey = getApiKey();
-  
-  if (!apiKey) {
-    throw new Error("API Key 未配置。请在 Vercel 环境变量中设置 'API_KEY', 'OPEN_API_KEY' 或 'BOYI'。");
-  }
-
-  // Initialize AI with the current key
-  const ai = initAI(apiKey);
+  // Initialize AI with the current key from process.env
+  // According to guidelines, we must use process.env.API_KEY directly.
+  // We create a new instance for each call to ensure we use the latest key (e.g. if selected via UI).
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
   // Extract mime type and clean base64 data
   const mimeMatch = base64Image.match(/^data:(image\/[a-zA-Z+]+);base64,/);
@@ -45,9 +29,10 @@ export const generateJewelryDesign = async (
     - Details: ${config.auxiliaryStone || 'Elegant minimalist style'}
     - View: ${config.viewAngle}
     - User Concept: ${config.description}
+    - Preferred Resolution: ${config.imageSize}
 
     VISUAL STYLE:
-    - 8K Resolution, Hyper-realistic, Macro Jewelry Photography.
+    - ${config.imageSize} Resolution, Hyper-realistic, Macro Jewelry Photography.
     - Lighting: Studio caustic lighting, emphasizing sparkle and metal sheen.
     - Background: Soft neutral gradient (white/cream/pale grey). Elegant and clean.
     
@@ -62,8 +47,10 @@ export const generateJewelryDesign = async (
   `;
 
   try {
+    // Switching to 'gemini-2.5-flash-image' as it is more widely available and stable for image generation 
+    // without requiring specific trusted tester permissions that might cause 403 errors on 'gemini-3-pro-image-preview'.
     const response = await ai.models.generateContent({
-      model: 'gemini-3-pro-image-preview',
+      model: 'gemini-2.5-flash-image', 
       contents: {
         parts: [
           {
@@ -79,7 +66,7 @@ export const generateJewelryDesign = async (
       },
       config: {
         imageConfig: {
-          imageSize: config.imageSize || '2K',
+          // 'imageSize' is not supported by gemini-2.5-flash-image, handled via prompt instead.
           aspectRatio: config.aspectRatio || '1:1',
         },
       },
@@ -101,7 +88,7 @@ export const generateJewelryDesign = async (
     }
 
     if (!image) {
-      throw new Error("生成失败，API 未返回图片数据。请重试。");
+      throw new Error("生成失败，API 未返回图片数据。请尝试更换图片或稍后重试。");
     }
 
     return {
@@ -111,9 +98,17 @@ export const generateJewelryDesign = async (
 
   } catch (error: any) {
     console.error("Gemini Generation Error:", error);
-    if (error.message?.includes('API key') || error.status === 403) {
-      throw new Error("API Key 无效或未配置。请检查环境变量设置 (API_KEY, OPEN_API_KEY 或 BOYI)。");
+    
+    // Enhance error message for the user
+    let errorMessage = "生成设计时出现问题。";
+    if (error.status === 403 || (error.message && error.message.includes("403"))) {
+      errorMessage = "API 权限被拒绝 (403)。请检查您的 API 密钥是否正确，或该密钥是否支持图像生成模型。";
+    } else if (error.status === 429) {
+      errorMessage = "请求过于频繁，请稍后重试。";
+    } else if (error.message) {
+      errorMessage = `错误: ${error.message}`;
     }
-    throw error;
+
+    throw new Error(errorMessage);
   }
 };

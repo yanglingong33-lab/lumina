@@ -51,6 +51,13 @@ function App() {
   // Check for AI Studio Key Selection
   useEffect(() => {
     const checkKey = async () => {
+      // If we already have a key from env/build config, we don't need to ask the user
+      // process.env.API_KEY is replaced by string literal at build time
+      if (process.env.API_KEY && process.env.API_KEY.length > 0) {
+        setNeedsApiKey(false);
+        return;
+      }
+
       if (window.aistudio) {
         const hasKey = await window.aistudio.hasSelectedApiKey();
         if (!hasKey) {
@@ -92,7 +99,7 @@ function App() {
     if (!originalImage) return;
     
     // Check key again before generating
-    if (window.aistudio && needsApiKey) {
+    if (needsApiKey && window.aistudio) {
       await handleSelectKey();
       return;
     }
@@ -382,7 +389,7 @@ function App() {
                   ) : needsApiKey ? (
                     <>
                       <KeyRound className="w-4 h-4 text-champagne-400" />
-                      连接 AI 密钥 (Connect Key)
+                      连接 AI 密钥
                     </>
                   ) : (
                     <>
