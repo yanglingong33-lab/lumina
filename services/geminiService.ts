@@ -102,6 +102,15 @@ async function generateViaSDK(
 ): Promise<GenerationResult> {
   const ai = new GoogleGenAI({ apiKey });
   
+  // Only send imageSize if the model supports it (Gemini 3 series)
+  const imageConfig: any = {
+    aspectRatio: config.aspectRatio || '1:1',
+  };
+
+  if (modelName.includes('gemini-3')) {
+    imageConfig.imageSize = config.imageSize;
+  }
+
   try {
     const response = await ai.models.generateContent({
       model: modelName, 
@@ -112,10 +121,7 @@ async function generateViaSDK(
         ],
       },
       config: {
-        imageConfig: {
-          aspectRatio: config.aspectRatio || '1:1',
-          imageSize: config.imageSize, // Supported by gemini-3-pro-image-preview
-        },
+        imageConfig,
       },
     });
 
@@ -142,6 +148,16 @@ async function generateViaProxy(
   // Construct the Google-compatible endpoint on the proxy
   const url = `${baseUrl}/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
 
+  // Prepare Config
+  const imageConfig: any = {
+    aspectRatio: config.aspectRatio || '1:1'
+  };
+
+  // Only add imageSize for Gemini 3 models to avoid 400 errors on older models
+  if (modelName.includes('gemini-3')) {
+    imageConfig.imageSize = config.imageSize;
+  }
+
   const payload = {
     contents: [{
       parts: [
@@ -150,10 +166,7 @@ async function generateViaProxy(
       ]
     }],
     generationConfig: {
-      imageConfig: {
-        aspectRatio: config.aspectRatio || '1:1',
-        imageSize: config.imageSize
-      }
+      imageConfig
     }
   };
 
@@ -223,7 +236,7 @@ function parseResponse(response: any): GenerationResult {
   if (!image) {
     // Graceful fallback: If no image part, check if text part exists (user might have used a text-only model by mistake)
     if (description) {
-      throw new Error("生成成功但仅返回了文本。您当前使用的模型/代理可能未返回图片数据(Base64)或标准格式。请尝试在设置中更改 Model Name 为 'gemini-3-pro-image-preview'。");
+      throw new Error("生成成功但仅返回了文本。这通常表示模型没有按照要求返回图片，或者代理不支持该功能。请在设置中尝试更换 'Model Name' (例如使用 gemini-2.0-flash-exp)。");
     }
     throw new Error("生成失败，API 未返回图片数据。");
   }
@@ -243,7 +256,7 @@ function handleError(error: any) {
   let errorMessage = "生成设计时出现问题。";
   
   if (error.status === 400 && (error.message?.includes("API key not valid") || error.message?.includes("INVALID_ARGUMENT"))) {
-     errorMessage = "API 密钥或参数无效 (400)。请检查设置中的 Base URL。";
+     errorMessage = "API 密钥或参数无效 (400)。请检查：1. Base URL 是否配置正确；2. 当前模型是否支持 'imageSize' (只有 Gemini 3 系列支持)。";
   } else if (error.status === 404) {
     errorMessage = `模型不存在 (404)。请在设置中修改 Model Name，当前模型可能不被支持。`;
   } else if (error.message) {
