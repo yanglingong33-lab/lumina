@@ -12,7 +12,7 @@ export const generateJewelryDesign = async (
   // 1. Try to get settings from Local Storage (User configured)
   let apiKey = process.env.API_KEY;
   let baseUrl: string | undefined = undefined;
-  let modelName = 'gemini-2.5-flash-image'; // Default model
+  let modelName = 'gemini-3-pro-image-preview'; // Updated default model
 
   try {
     const savedSettings = localStorage.getItem('lumina_settings');
@@ -83,7 +83,7 @@ export const generateJewelryDesign = async (
   // --- STRATEGY SELECTION ---
   
   if (baseUrl) {
-    return await generateViaProxy(baseUrl, apiKey, prompt, cleanBase64, mimeType, modelName);
+    return await generateViaProxy(baseUrl, apiKey, prompt, cleanBase64, mimeType, config, modelName);
   } else {
     return await generateViaSDK(apiKey, prompt, cleanBase64, mimeType, config, modelName);
   }
@@ -114,6 +114,7 @@ async function generateViaSDK(
       config: {
         imageConfig: {
           aspectRatio: config.aspectRatio || '1:1',
+          imageSize: config.imageSize, // Supported by gemini-3-pro-image-preview
         },
       },
     });
@@ -134,6 +135,7 @@ async function generateViaProxy(
   prompt: string,
   base64Image: string,
   mimeType: string,
+  config: DesignConfig,
   modelName: string
 ): Promise<GenerationResult> {
   
@@ -146,7 +148,13 @@ async function generateViaProxy(
         { text: prompt },
         { inlineData: { mimeType: mimeType, data: base64Image } }
       ]
-    }]
+    }],
+    generationConfig: {
+      imageConfig: {
+        aspectRatio: config.aspectRatio || '1:1',
+        imageSize: config.imageSize
+      }
+    }
   };
 
   try {
@@ -200,10 +208,22 @@ function parseResponse(response: any): GenerationResult {
     }
   }
 
+  // Fallback: If no inlineData, check if image is embedded in text (Markdown/URL)
+  // Some proxies or models return: ![image](https://...)
+  if (!image && description) {
+    const markdownImageRegex = /!\[.*?\]\((.*?)\)/;
+    const match = description.match(markdownImageRegex);
+    if (match && match[1]) {
+      image = match[1];
+      // Optionally clean the image markdown from description so it doesn't show up in text box
+      description = description.replace(match[0], '').trim();
+    }
+  }
+
   if (!image) {
     // Graceful fallback: If no image part, check if text part exists (user might have used a text-only model by mistake)
     if (description) {
-      throw new Error("生成成功但仅返回了文本。您当前使用的模型不支持生成图片，请在设置中尝试更改 'Model Name' (例如 gemini-2.5-flash-image 或其他支持画图的模型)。");
+      throw new Error("生成成功但仅返回了文本。您当前使用的模型/代理可能未返回图片数据(Base64)或标准格式。请尝试在设置中更改 Model Name 为 'gemini-3-pro-image-preview'。");
     }
     throw new Error("生成失败，API 未返回图片数据。");
   }

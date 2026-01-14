@@ -443,12 +443,12 @@ function App() {
                     type="text" 
                     value={settings.modelName || ''}
                     onChange={(e) => setSettings({...settings, modelName: e.target.value})}
-                    placeholder="gemini-2.5-flash-image"
+                    placeholder="gemini-3-pro-image-preview"
                     className="w-full bg-stone-50 border border-stone-200 rounded-lg px-4 py-3 text-sm focus:border-champagne-400 focus:ring-1 focus:ring-champagne-400/20 outline-none"
                    />
                    <p className="text-[10px] text-stone-400">
-                     默认: gemini-2.5-flash-image。
-                     <br/>如果您的代理不支持，请尝试输入: <code>gemini-1.5-flash</code> 或 <code>gemini-2.0-flash-exp</code>
+                     默认: gemini-3-pro-image-preview。
+                     <br/>如果您的代理不支持，请尝试输入: <code>gemini-2.0-flash-exp</code> 或其他支持画图的模型。
                    </p>
                 </div>
              </div>
