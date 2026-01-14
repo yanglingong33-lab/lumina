@@ -1,22 +1,17 @@
 import { GoogleGenAI } from "@google/genai";
 import { DesignConfig, GenerationResult } from "../types";
 
-// Safely access environment variables without crashing in browser environments
+// With the updated Vite config, process.env.API_KEY is replaced by the string literal.
+// We access it directly.
 const getApiKey = () => {
-  try {
-    if (typeof process !== 'undefined' && process.env) {
-      return process.env.API_KEY || '';
-    }
-  } catch (e) {
-    // Ignore reference errors
-  }
-  return '';
+  // @ts-ignore - Process might be technically undefined in types, but replaced by Vite build
+  return process.env.API_KEY || '';
 };
 
-const GEMINI_API_KEY = getApiKey();
-
-// Initialize the client
-const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+// Initialize the client helper
+const initAI = (key: string) => {
+  return new GoogleGenAI({ apiKey: key });
+};
 
 /**
  * Generates a jewelry design based on an input image and configuration.
@@ -25,9 +20,14 @@ export const generateJewelryDesign = async (
   base64Image: string,
   config: DesignConfig
 ): Promise<GenerationResult> => {
-  if (!GEMINI_API_KEY) {
-    throw new Error("API Key 未配置。请在 Vercel 设置中添加名为 'API_KEY' 的环境变量。");
+  const apiKey = getApiKey();
+  
+  if (!apiKey) {
+    throw new Error("API Key 未配置。请在 Vercel 环境变量中设置 'API_KEY'。");
   }
+
+  // Initialize AI with the current key
+  const ai = initAI(apiKey);
 
   // Extract mime type and clean base64 data
   const mimeMatch = base64Image.match(/^data:(image\/[a-zA-Z+]+);base64,/);
@@ -111,9 +111,8 @@ export const generateJewelryDesign = async (
 
   } catch (error: any) {
     console.error("Gemini Generation Error:", error);
-    // Improve error message for user
-    if (error.message?.includes('API key')) {
-      throw new Error("API Key 无效或未配置。请检查环境变量。");
+    if (error.message?.includes('API key') || error.status === 403) {
+      throw new Error("API Key 无效或未配置。请检查 Vercel 环境变量设置。");
     }
     throw error;
   }

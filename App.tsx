@@ -5,7 +5,17 @@ import ComparisonSlider from './components/ComparisonSlider';
 import ConfigPanel from './components/ConfigPanel';
 import ImageUploader from './components/ImageUploader';
 import HistoryDrawer from './components/HistoryDrawer';
-import { Gem, Download, Trash2, Loader2, Sparkles, Heart } from 'lucide-react';
+import { Gem, Download, Trash2, Loader2, Sparkles, Heart, KeyRound } from 'lucide-react';
+
+// Declaration for AI Studio window object
+// Augment the AIStudio interface to include the required methods. 
+// This avoids conflict with existing Window.aistudio declaration.
+declare global {
+  interface AIStudio {
+    hasSelectedApiKey: () => Promise<boolean>;
+    openSelectKey: () => Promise<void>;
+  }
+}
 
 function App() {
   const [appState, setAppState] = useState<AppState>('IDLE');
@@ -14,12 +24,13 @@ function App() {
   const [generatedDescription, setGeneratedDescription] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [needsApiKey, setNeedsApiKey] = useState(false);
   
   // Collection/Favorites State with Local Storage Persistence
   const [history, setHistory] = useState<DesignHistoryItem[]>(() => {
     if (typeof window !== 'undefined') {
       try {
-        const saved = localStorage.getItem('lumina_collection'); // Updated key
+        const saved = localStorage.getItem('lumina_collection');
         return saved ? JSON.parse(saved) : [];
       } catch (e) {
         console.error("Failed to load collection", e);
@@ -33,10 +44,32 @@ function App() {
   const [isSaved, setIsSaved] = useState(false);
   const [currentDesignId, setCurrentDesignId] = useState<string | null>(null);
 
-  // Persist history whenever it changes
   useEffect(() => {
     localStorage.setItem('lumina_collection', JSON.stringify(history));
   }, [history]);
+
+  // Check for AI Studio Key Selection
+  useEffect(() => {
+    const checkKey = async () => {
+      if (window.aistudio) {
+        const hasKey = await window.aistudio.hasSelectedApiKey();
+        if (!hasKey) {
+          setNeedsApiKey(true);
+        }
+      }
+    };
+    checkKey();
+  }, []);
+
+  const handleSelectKey = async () => {
+    if (window.aistudio) {
+      await window.aistudio.openSelectKey();
+      const hasKey = await window.aistudio.hasSelectedApiKey();
+      if (hasKey) {
+        setNeedsApiKey(false);
+      }
+    }
+  };
 
   const [config, setConfig] = useState<DesignConfig>({
     metal: MetalType.YellowGold,
@@ -58,6 +91,12 @@ function App() {
 
   const handleGenerate = async () => {
     if (!originalImage) return;
+    
+    // Check key again before generating
+    if (window.aistudio && await window.aistudio.hasSelectedApiKey() === false) {
+      setNeedsApiKey(true);
+      return;
+    }
     
     setIsGenerating(true);
     setError(null);
@@ -145,7 +184,6 @@ function App() {
     setGeneratedDescription(item.designDescription || null);
     setConfig({
       ...item.config,
-      // Handle legacy items that might not have imageSize
       imageSize: item.config.imageSize || ImageSize.S_2K 
     });
     setAppState('RESULT');
@@ -169,13 +207,25 @@ function App() {
           </div>
         </div>
 
-        <button 
-          onClick={() => setIsHistoryOpen(true)}
-          className="group flex items-center gap-2 px-4 py-2 rounded-full hover:bg-stone-100 transition-all text-stone-500 hover:text-stone-800"
-        >
-          <Heart className="w-5 h-5 group-hover:scale-110 group-hover:text-red-400 transition-all duration-300" />
-          <span className="hidden md:inline text-xs font-bold uppercase tracking-widest">我的收藏</span>
-        </button>
+        <div className="flex items-center gap-2">
+           {needsApiKey && (
+            <button 
+              onClick={handleSelectKey}
+              className="group flex items-center gap-2 px-4 py-2 rounded-full bg-champagne-100 text-champagne-900 hover:bg-champagne-200 transition-all text-xs font-bold uppercase tracking-widest mr-2"
+            >
+              <KeyRound className="w-4 h-4" />
+              <span>Connect AI Key</span>
+            </button>
+          )}
+          
+          <button 
+            onClick={() => setIsHistoryOpen(true)}
+            className="group flex items-center gap-2 px-4 py-2 rounded-full hover:bg-stone-100 transition-all text-stone-500 hover:text-stone-800"
+          >
+            <Heart className="w-5 h-5 group-hover:scale-110 group-hover:text-red-400 transition-all duration-300" />
+            <span className="hidden md:inline text-xs font-bold uppercase tracking-widest">我的收藏</span>
+          </button>
+        </div>
       </header>
 
       {/* Main Layout */}
@@ -294,7 +344,7 @@ function App() {
                  setConfig={setConfig} 
                  onGenerate={handleGenerate}
                  isGenerating={isGenerating}
-                 disabled={!originalImage}
+                 disabled={!originalImage || needsApiKey}
                  generatedDescription={generatedDescription}
                />
             </div>
@@ -308,10 +358,10 @@ function App() {
             <div className="md:hidden absolute bottom-0 left-0 right-0 p-4 bg-white/95 backdrop-blur border-t border-stone-100 pb-safe z-30 shadow-[0_-5px_20px_rgba(0,0,0,0.05)] animate-slide-up">
                <button
                 onClick={handleGenerate}
-                disabled={isGenerating || !originalImage}
+                disabled={isGenerating || !originalImage || needsApiKey}
                 className={`
                   w-full relative overflow-hidden rounded-xl py-3.5
-                  ${(!originalImage || isGenerating) ? 'bg-stone-100 text-stone-400 cursor-not-allowed' : 'bg-stone-900 text-white cursor-pointer active:scale-[0.98]'}
+                  ${(!originalImage || isGenerating || needsApiKey) ? 'bg-stone-100 text-stone-400 cursor-not-allowed' : 'bg-stone-900 text-white cursor-pointer active:scale-[0.98]'}
                   font-bold tracking-widest text-sm transition-all duration-300 shadow-lg
                 `}
               >

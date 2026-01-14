@@ -7,22 +7,6 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
     <script>
-      // Catch global errors to prevent white screen
-      window.onerror = function(msg, url, line, col, error) {
-        const root = document.getElementById('root');
-        if (root && root.innerHTML === '') {
-           document.body.innerHTML = `
-            <div style="padding: 20px; font-family: sans-serif; color: #78350f; background: #fffbeb; height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;">
-              <h2 style="font-size: 1.5rem; margin-bottom: 1rem;">Application Error</h2>
-              <p style="margin-bottom: 1rem;">The application failed to start.</p>
-              <pre style="background: rgba(0,0,0,0.05); padding: 1rem; border-radius: 0.5rem; overflow: auto; max-width: 90vw;">${msg}</pre>
-              <p style="margin-top: 1rem; font-size: 0.8rem; opacity: 0.7;">Check your browser console for more details.</p>
-            </div>
-           `;
-        }
-        return false;
-      };
-
       tailwind.config = {
         theme: {
           extend: {
@@ -43,7 +27,7 @@
                 100: '#F9F1D8',
                 200: '#F0DEAA',
                 300: '#E6CB7D',
-                400: '#D4AF37', // Classic Gold
+                400: '#D4AF37',
                 500: '#B89628',
                 600: '#997B1B',
                 900: '#4D3D0D',
@@ -83,34 +67,22 @@
       }
     </script>
     <style>
-      /* Custom scrollbar for light theme */
-      ::-webkit-scrollbar {
-        width: 6px;
-        height: 6px;
-      }
-      ::-webkit-scrollbar-track {
-        background: transparent; 
-      }
-      ::-webkit-scrollbar-thumb {
-        background: #D6D3D1; 
-        border-radius: 10px;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #A8A29E; 
-      }
-      body {
-        -webkit-tap-highlight-color: transparent;
-      }
+      ::-webkit-scrollbar { width: 6px; height: 6px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: #D6D3D1; border-radius: 10px; }
+      ::-webkit-scrollbar-thumb:hover { background: #A8A29E; }
+      body { -webkit-tap-highlight-color: transparent; }
     </style>
   <script type="importmap">
 {
   "imports": {
-    "react/": "https://esm.sh/react@^19.2.3/",
     "react": "https://esm.sh/react@^19.2.3",
-    "@google/genai": "https://esm.sh/@google/genai@^1.35.0",
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "react-dom": "https://esm.sh/react-dom@^19.2.3",
-    "lucide-react": "https://esm.sh/lucide-react@^0.562.0"
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "@google/genai": "https://esm.sh/@google/genai@^1.35.0",
+    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
+    "vite": "https://esm.sh/vite@^7.3.1",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2"
   }
 }
 </script>
