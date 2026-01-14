@@ -1,0 +1,7 @@
+{
+  "name": "Lumina Jewelry Designer",
+  "description": "Transform everyday objects into exquisite jewelry designs using AI. Upload a photo, select materials, and visualize the transformation.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
