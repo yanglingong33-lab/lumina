@@ -12,7 +12,7 @@ export const generateJewelryDesign = async (
   // 1. Try to get settings from Local Storage (User configured)
   let apiKey = process.env.API_KEY;
   let baseUrl: string | undefined = undefined;
-  let modelName = 'gemini-3-pro-image-preview'; // Updated default model
+  let modelName = 'gemini-3-pro-image-preview'; // Default
 
   try {
     const savedSettings = localStorage.getItem('lumina_settings');
@@ -102,16 +102,17 @@ async function generateViaSDK(
 ): Promise<GenerationResult> {
   const ai = new GoogleGenAI({ apiKey });
   
-  // Only send imageSize if the model supports it (Gemini 3 series)
+  // Base config
   const imageConfig: any = {
     aspectRatio: config.aspectRatio || '1:1',
   };
 
+  // Optimistically add imageSize for Gemini 3, but be ready to retry without it
   if (modelName.includes('gemini-3')) {
     imageConfig.imageSize = config.imageSize;
   }
 
-  try {
+  const doGenerate = async (currentImageConfig: any) => {
     const response = await ai.models.generateContent({
       model: modelName, 
       contents: {
@@ -121,12 +122,27 @@ async function generateViaSDK(
         ],
       },
       config: {
-        imageConfig,
+        imageConfig: currentImageConfig,
       },
     });
-
     return parseResponse(response);
+  };
+
+  try {
+    return await doGenerate(imageConfig);
   } catch (error: any) {
+    // Retry logic: If failed with 400 and we sent imageSize, try again without it
+    if (error.status === 400 && imageConfig.imageSize) {
+      console.warn("SDK Generation failed with imageSize, retrying without it...");
+      delete imageConfig.imageSize;
+      try {
+        return await doGenerate(imageConfig);
+      } catch (retryError: any) {
+        handleError(retryError);
+        throw retryError;
+      }
+    }
+    
     handleError(error);
     throw error; 
   }
@@ -145,20 +161,17 @@ async function generateViaProxy(
   modelName: string
 ): Promise<GenerationResult> {
   
-  // Construct the Google-compatible endpoint on the proxy
   const url = `${baseUrl}/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
 
-  // Prepare Config
   const imageConfig: any = {
     aspectRatio: config.aspectRatio || '1:1'
   };
 
-  // Only add imageSize for Gemini 3 models to avoid 400 errors on older models
   if (modelName.includes('gemini-3')) {
     imageConfig.imageSize = config.imageSize;
   }
 
-  const payload = {
+  const makePayload = (imgConfig: any) => ({
     contents: [{
       parts: [
         { text: prompt },
@@ -166,11 +179,11 @@ async function generateViaProxy(
       ]
     }],
     generationConfig: {
-      imageConfig
+      imageConfig: imgConfig
     }
-  };
+  });
 
-  try {
+  const performFetch = async (payload: any) => {
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -195,8 +208,23 @@ async function generateViaProxy(
 
     const data = await response.json();
     return parseResponse(data);
+  };
 
+  try {
+    return await performFetch(makePayload(imageConfig));
   } catch (error: any) {
+    // Retry logic: If failed with 400 and we sent imageSize, try again without it
+    if (error.status === 400 && imageConfig.imageSize) {
+      console.warn("Proxy Generation failed with imageSize, retrying without it...");
+      delete imageConfig.imageSize;
+      try {
+        return await performFetch(makePayload(imageConfig));
+      } catch (retryError: any) {
+        handleError(retryError);
+        throw retryError;
+      }
+    }
+    
     handleError(error);
     throw error;
   }
@@ -222,19 +250,16 @@ function parseResponse(response: any): GenerationResult {
   }
 
   // Fallback: If no inlineData, check if image is embedded in text (Markdown/URL)
-  // Some proxies or models return: ![image](https://...)
   if (!image && description) {
     const markdownImageRegex = /!\[.*?\]\((.*?)\)/;
     const match = description.match(markdownImageRegex);
     if (match && match[1]) {
       image = match[1];
-      // Optionally clean the image markdown from description so it doesn't show up in text box
       description = description.replace(match[0], '').trim();
     }
   }
 
   if (!image) {
-    // Graceful fallback: If no image part, check if text part exists (user might have used a text-only model by mistake)
     if (description) {
       throw new Error("生成成功但仅返回了文本。这通常表示模型没有按照要求返回图片，或者代理不支持该功能。请在设置中尝试更换 'Model Name' (例如使用 gemini-2.0-flash-exp)。");
     }
@@ -256,7 +281,8 @@ function handleError(error: any) {
   let errorMessage = "生成设计时出现问题。";
   
   if (error.status === 400 && (error.message?.includes("API key not valid") || error.message?.includes("INVALID_ARGUMENT"))) {
-     errorMessage = "API 密钥或参数无效 (400)。请检查：1. Base URL 是否配置正确；2. 当前模型是否支持 'imageSize' (只有 Gemini 3 系列支持)。";
+     // If we are here, retry failed or wasn't applicable.
+     errorMessage = "API 密钥或参数无效 (400)。可能是 Base URL 配置错误，或者该模型完全不支持图片生成参数。";
   } else if (error.status === 404) {
     errorMessage = `模型不存在 (404)。请在设置中修改 Model Name，当前模型可能不被支持。`;
   } else if (error.message) {
