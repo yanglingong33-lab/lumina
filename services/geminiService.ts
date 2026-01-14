@@ -17,8 +17,10 @@ export const generateJewelryDesign = async (
     throw new Error("API Key is missing. Please check your environment variables.");
   }
 
-  // Clean the base64 string if it contains the header
-  const cleanBase64 = base64Image.replace(/^data:image\/(png|jpeg|jpg|webp);base64,/, '');
+  // Extract mime type and clean base64 data
+  const mimeMatch = base64Image.match(/^data:(image\/[a-zA-Z+]+);base64,/);
+  const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+  const cleanBase64 = base64Image.replace(/^data:image\/[a-zA-Z+]+;base64,/, '');
 
   const prompt = `
     Role: World-class High Jewelry Designer (e.g., Cartier, Van Cleef & Arpels).
@@ -57,7 +59,7 @@ export const generateJewelryDesign = async (
           },
           {
             inlineData: {
-              mimeType: 'image/jpeg', 
+              mimeType: mimeType, 
               data: cleanBase64,
             },
           },
