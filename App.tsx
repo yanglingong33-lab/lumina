@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { DesignConfig, MetalType, GemstoneType, JewelryType, ViewAngle, ImageSize, AppState, DesignHistoryItem } from './types';
+import { DesignConfig, MetalType, GemstoneType, JewelryType, ViewAngle, ImageSize, AspectRatio, AppState, DesignHistoryItem } from './types';
 import { generateJewelryDesign } from './services/geminiService';
 import ComparisonSlider from './components/ComparisonSlider';
 import ConfigPanel from './components/ConfigPanel';
@@ -64,10 +64,8 @@ function App() {
   const handleSelectKey = async () => {
     if (window.aistudio) {
       await window.aistudio.openSelectKey();
-      const hasKey = await window.aistudio.hasSelectedApiKey();
-      if (hasKey) {
-        setNeedsApiKey(false);
-      }
+      // Assume success to avoid race condition with hasSelectedApiKey
+      setNeedsApiKey(false);
     }
   };
 
@@ -78,6 +76,7 @@ function App() {
     type: JewelryType.Ring,
     viewAngle: ViewAngle.Front,
     imageSize: ImageSize.S_2K,
+    aspectRatio: AspectRatio.Square,
     description: '',
   });
 
@@ -93,8 +92,8 @@ function App() {
     if (!originalImage) return;
     
     // Check key again before generating
-    if (window.aistudio && await window.aistudio.hasSelectedApiKey() === false) {
-      setNeedsApiKey(true);
+    if (window.aistudio && needsApiKey) {
+      await handleSelectKey();
       return;
     }
     
@@ -117,6 +116,14 @@ function App() {
       setAppState('CONFIGURING');
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  const handleMainButtonClick = () => {
+    if (needsApiKey) {
+      handleSelectKey();
+    } else {
+      handleGenerate();
     }
   };
 
@@ -184,7 +191,8 @@ function App() {
     setGeneratedDescription(item.designDescription || null);
     setConfig({
       ...item.config,
-      imageSize: item.config.imageSize || ImageSize.S_2K 
+      imageSize: item.config.imageSize || ImageSize.S_2K,
+      aspectRatio: item.config.aspectRatio || AspectRatio.Square
     });
     setAppState('RESULT');
     setIsHistoryOpen(false);
@@ -342,9 +350,9 @@ function App() {
                <ConfigPanel 
                  config={config} 
                  setConfig={setConfig} 
-                 onGenerate={handleGenerate}
+                 onGenerate={handleMainButtonClick}
                  isGenerating={isGenerating}
-                 disabled={!originalImage || needsApiKey}
+                 disabled={!originalImage}
                  generatedDescription={generatedDescription}
                />
             </div>
@@ -357,11 +365,11 @@ function App() {
           {originalImage && (
             <div className="md:hidden absolute bottom-0 left-0 right-0 p-4 bg-white/95 backdrop-blur border-t border-stone-100 pb-safe z-30 shadow-[0_-5px_20px_rgba(0,0,0,0.05)] animate-slide-up">
                <button
-                onClick={handleGenerate}
-                disabled={isGenerating || !originalImage || needsApiKey}
+                onClick={handleMainButtonClick}
+                disabled={isGenerating || !originalImage}
                 className={`
                   w-full relative overflow-hidden rounded-xl py-3.5
-                  ${(!originalImage || isGenerating || needsApiKey) ? 'bg-stone-100 text-stone-400 cursor-not-allowed' : 'bg-stone-900 text-white cursor-pointer active:scale-[0.98]'}
+                  ${(!originalImage || isGenerating) ? 'bg-stone-100 text-stone-400 cursor-not-allowed' : 'bg-stone-900 text-white cursor-pointer active:scale-[0.98]'}
                   font-bold tracking-widest text-sm transition-all duration-300 shadow-lg
                 `}
               >
@@ -370,6 +378,11 @@ function App() {
                     <>
                       <Loader2 className="animate-spin w-4 h-4 text-champagne-400" />
                       正在生成...
+                    </>
+                  ) : needsApiKey ? (
+                    <>
+                      <KeyRound className="w-4 h-4 text-champagne-400" />
+                      连接 AI 密钥 (Connect Key)
                     </>
                   ) : (
                     <>

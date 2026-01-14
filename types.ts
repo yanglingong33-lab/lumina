@@ -41,6 +41,14 @@ export enum ImageSize {
   S_4K = '4K'
 }
 
+export enum AspectRatio {
+  Square = '1:1',
+  Portrait_3_4 = '3:4',
+  Landscape_4_3 = '4:3',
+  Portrait_9_16 = '9:16',
+  Landscape_16_9 = '16:9'
+}
+
 export interface DesignConfig {
   metal: MetalType;
   gemstone: GemstoneType;
@@ -48,6 +56,7 @@ export interface DesignConfig {
   type: JewelryType;
   viewAngle: ViewAngle;
   imageSize: ImageSize;
+  aspectRatio: AspectRatio;
   description: string;
 }
 

@@ -23,7 +23,7 @@ export const generateJewelryDesign = async (
   const apiKey = getApiKey();
   
   if (!apiKey) {
-    throw new Error("API Key 未配置。请在 Vercel 环境变量中设置 'API_KEY'。");
+    throw new Error("API Key 未配置。请在 Vercel 环境变量中设置 'API_KEY' 或 'OPEN_API_KEY'。");
   }
 
   // Initialize AI with the current key
@@ -80,7 +80,7 @@ export const generateJewelryDesign = async (
       config: {
         imageConfig: {
           imageSize: config.imageSize || '2K',
-          aspectRatio: '1:1',
+          aspectRatio: config.aspectRatio || '1:1',
         },
       },
     });
@@ -112,7 +112,7 @@ export const generateJewelryDesign = async (
   } catch (error: any) {
     console.error("Gemini Generation Error:", error);
     if (error.message?.includes('API key') || error.status === 403) {
-      throw new Error("API Key 无效或未配置。请检查 Vercel 环境变量设置。");
+      throw new Error("API Key 无效或未配置。请检查环境变量设置 (API_KEY 或 OPEN_API_KEY)。");
     }
     throw error;
   }

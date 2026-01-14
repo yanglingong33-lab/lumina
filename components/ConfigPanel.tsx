@@ -1,6 +1,6 @@
 import React from 'react';
-import { DesignConfig, MetalType, GemstoneType, JewelryType, ViewAngle, ImageSize } from '../types';
-import { Loader2, Sparkles, ChevronDown, Quote } from 'lucide-react';
+import { DesignConfig, MetalType, GemstoneType, JewelryType, ViewAngle, ImageSize, AspectRatio } from '../types';
+import { Loader2, Sparkles, ChevronDown, Quote, KeyRound } from 'lucide-react';
 
 interface ConfigPanelProps {
   config: DesignConfig;
@@ -94,6 +94,7 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ config, setConfig, onGenerate
         
         <div className="grid grid-cols-2 gap-4 md:gap-6">
            <SelectGroup label="Perspective" field="viewAngle" options={ViewAngle} delayClass="delay-[150ms]" />
+           <SelectGroup label="Aspect Ratio" field="aspectRatio" options={AspectRatio} delayClass="delay-[175ms]" />
         </div>
 
         <div className="space-y-3 group animate-fade-in-up opacity-0 fill-mode-forwards delay-[300ms]">
