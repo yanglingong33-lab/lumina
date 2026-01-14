@@ -23,14 +23,26 @@ export const generateJewelryDesign = async (
       }
       if (parsed.baseUrl && parsed.baseUrl.trim()) {
         let rawUrl = parsed.baseUrl.trim();
+        // Remove trailing slashes
         rawUrl = rawUrl.replace(/\/+$/, '');
         
-        if (rawUrl.includes('/images/generations')) {
+        // Intelligent cleaning of the Base URL
+        // We want the root or the path prefix before /v1beta
+        // Common patterns: 
+        // https://api.proxy.com/v1 -> remove /v1
+        // https://api.proxy.com/google -> keep /google
+        // https://api.proxy.com -> keep as is
+        
+        if (rawUrl.endsWith('/v1')) {
+          rawUrl = rawUrl.substring(0, rawUrl.length - 3);
+        } else if (rawUrl.endsWith('/v1beta/models')) {
+           rawUrl = rawUrl.split('/v1beta/models')[0];
+        } else if (rawUrl.endsWith('/v1beta')) {
+           rawUrl = rawUrl.substring(0, rawUrl.length - 7);
+        } else if (rawUrl.includes('/images/generations')) {
            rawUrl = rawUrl.split('/v1/images')[0];
         } else if (rawUrl.includes('/chat/completions')) {
            rawUrl = rawUrl.split('/v1/chat')[0];
-        } else if (rawUrl.includes('/models')) {
-           rawUrl = rawUrl.split('/v1beta/models')[0];
         }
         
         baseUrl = rawUrl;
@@ -102,15 +114,21 @@ async function generateViaSDK(
 ): Promise<GenerationResult> {
   const ai = new GoogleGenAI({ apiKey });
   
-  // Base config
-  const imageConfig: any = {
-    aspectRatio: config.aspectRatio || '1:1',
-  };
+  // Strategy: 
+  // 1. Try with full config (imageSize + aspectRatio)
+  // 2. If 400, try without imageSize
+  // 3. If 400, try without aspectRatio (minimal config)
 
-  // Optimistically add imageSize for Gemini 3, but be ready to retry without it
-  if (modelName.includes('gemini-3')) {
-    imageConfig.imageSize = config.imageSize;
-  }
+  const makeConfig = (level: 'full' | 'no-size' | 'minimal') => {
+    const imgConfig: any = {};
+    if (level !== 'minimal') {
+      imgConfig.aspectRatio = config.aspectRatio || '1:1';
+    }
+    if (level === 'full' && modelName.includes('gemini-3')) {
+      imgConfig.imageSize = config.imageSize;
+    }
+    return imgConfig;
+  };
 
   const doGenerate = async (currentImageConfig: any) => {
     const response = await ai.models.generateContent({
@@ -129,20 +147,27 @@ async function generateViaSDK(
   };
 
   try {
-    return await doGenerate(imageConfig);
+    return await doGenerate(makeConfig('full'));
   } catch (error: any) {
-    // Retry logic: If failed with 400 and we sent imageSize, try again without it
-    if (error.status === 400 && imageConfig.imageSize) {
-      console.warn("SDK Generation failed with imageSize, retrying without it...");
-      delete imageConfig.imageSize;
+    console.warn("SDK Full Config Failed:", error.message);
+    if (isRetryable400(error)) {
       try {
-        return await doGenerate(imageConfig);
+        console.warn("Retrying without imageSize...");
+        return await doGenerate(makeConfig('no-size'));
       } catch (retryError: any) {
+        if (isRetryable400(retryError)) {
+           try {
+              console.warn("Retrying with minimal config...");
+              return await doGenerate(makeConfig('minimal'));
+           } catch (finalError) {
+              handleError(finalError);
+              throw finalError;
+           }
+        }
         handleError(retryError);
         throw retryError;
       }
     }
-    
     handleError(error);
     throw error; 
   }
@@ -163,25 +188,29 @@ async function generateViaProxy(
   
   const url = `${baseUrl}/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
 
-  const imageConfig: any = {
-    aspectRatio: config.aspectRatio || '1:1'
-  };
-
-  if (modelName.includes('gemini-3')) {
-    imageConfig.imageSize = config.imageSize;
-  }
-
-  const makePayload = (imgConfig: any) => ({
-    contents: [{
-      parts: [
-        { text: prompt },
-        { inlineData: { mimeType: mimeType, data: base64Image } }
-      ]
-    }],
-    generationConfig: {
-      imageConfig: imgConfig
+  const makePayload = (level: 'full' | 'no-size' | 'minimal') => {
+    const imgConfig: any = {};
+    
+    if (level !== 'minimal') {
+      imgConfig.aspectRatio = config.aspectRatio || '1:1';
     }
-  });
+    
+    if (level === 'full' && modelName.includes('gemini-3')) {
+      imgConfig.imageSize = config.imageSize;
+    }
+
+    return {
+      contents: [{
+        parts: [
+          { text: prompt },
+          { inlineData: { mimeType: mimeType, data: base64Image } }
+        ]
+      }],
+      generationConfig: {
+        imageConfig: imgConfig
+      }
+    };
+  };
 
   const performFetch = async (payload: any) => {
     const response = await fetch(url, {
@@ -211,15 +240,23 @@ async function generateViaProxy(
   };
 
   try {
-    return await performFetch(makePayload(imageConfig));
+    return await performFetch(makePayload('full'));
   } catch (error: any) {
-    // Retry logic: If failed with 400 and we sent imageSize, try again without it
-    if (error.status === 400 && imageConfig.imageSize) {
-      console.warn("Proxy Generation failed with imageSize, retrying without it...");
-      delete imageConfig.imageSize;
+    console.warn("Proxy Full Config Failed:", error.message);
+    if (isRetryable400(error)) {
       try {
-        return await performFetch(makePayload(imageConfig));
+        console.warn("Retrying without imageSize...");
+        return await performFetch(makePayload('no-size'));
       } catch (retryError: any) {
+        if (isRetryable400(retryError)) {
+          try {
+             console.warn("Retrying with minimal config...");
+             return await performFetch(makePayload('minimal'));
+          } catch (finalError) {
+             handleError(finalError);
+             throw finalError;
+          }
+        }
         handleError(retryError);
         throw retryError;
       }
@@ -228,6 +265,10 @@ async function generateViaProxy(
     handleError(error);
     throw error;
   }
+}
+
+function isRetryable400(error: any) {
+  return error.status === 400 || (error.message && error.message.includes('INVALID_ARGUMENT'));
 }
 
 /**
@@ -280,11 +321,13 @@ function handleError(error: any) {
     
   let errorMessage = "生成设计时出现问题。";
   
-  if (error.status === 400 && (error.message?.includes("API key not valid") || error.message?.includes("INVALID_ARGUMENT"))) {
-     // If we are here, retry failed or wasn't applicable.
-     errorMessage = "API 密钥或参数无效 (400)。可能是 Base URL 配置错误，或者该模型完全不支持图片生成参数。";
+  // Check for fetch failures (often Network errors or CORS)
+  if (error instanceof TypeError && error.message.includes("Failed to fetch")) {
+    errorMessage = "网络请求失败。如果您在中国大陆，请检查 VPN 连接或配置正确的 Base URL 代理地址。";
+  } else if (error.status === 400 && (error.message?.includes("API key not valid") || error.message?.includes("INVALID_ARGUMENT"))) {
+     errorMessage = "API 密钥或参数无效 (400)。请检查：1. Base URL 是否正确 (无需 /v1 后缀)；2. API Key 是否有效。";
   } else if (error.status === 404) {
-    errorMessage = `模型不存在 (404)。请在设置中修改 Model Name，当前模型可能不被支持。`;
+    errorMessage = `模型不存在 (404)。请在设置中修改 Model Name (如 gemini-2.0-flash-exp)。`;
   } else if (error.message) {
     errorMessage = `错误: ${error.message}`;
   }
