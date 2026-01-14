@@ -21,28 +21,28 @@ export const generateJewelryDesign = async (
   const cleanBase64 = base64Image.replace(/^data:image\/(png|jpeg|jpg|webp);base64,/, '');
 
   const prompt = `
-    Act as a world-class high jewelry designer from a top luxury house (e.g., Cartier, Bulgari, Van Cleef & Arpels). 
-    Your task is to creatively transform the shape, pattern, or essence of the provided input object into a magnificent piece of high jewelry.
+    Role: World-class High Jewelry Designer (e.g., Cartier, Van Cleef & Arpels).
+    Task: Creatively transform the FORM and ESSENCE of the input image into a luxury jewelry design.
 
-    The user configuration is provided in Chinese, translate contextually to jewelry terms:
-    DESIGN SPECIFICATIONS:
-    - **Jewelry Type**: ${config.type}
-    - **Primary Metal**: ${config.metal} (Ensure realistic metal texture, reflection, and weight).
-    - **Main Gemstone**: ${config.gemstone} (Focus on cut, clarity, and light refraction).
-    - **Auxiliary Stones**: ${config.auxiliaryStone || 'Minimalist/None'}
-    - **User's Vision**: ${config.description}
-    - **View Perspective**: ${config.viewAngle}
+    DESIGN PARAMETERS:
+    - Type: ${config.type}
+    - Material: ${config.metal} (Realistic texture/reflection)
+    - Main Stone: ${config.gemstone} (High refraction/clarity)
+    - Details: ${config.auxiliaryStone || 'Elegant minimalist style'}
+    - View: ${config.viewAngle}
+    - User Concept: ${config.description}
 
-    VISUAL REQUIREMENTS:
-    - **Style**: Ultra-Photorealistic, 8k resolution, Macro Photography, Cinematic Lighting.
-    - **Quality**: Masterpiece, highly detailed textures, ray-tracing, precise light caustics.
-    - **Lighting**: Studio lighting, soft shadows, sharp metallic reflections.
-    - **Background**: A clean, elegant, neutral gradient (very light grey or soft cream) to make the jewelry pop. Do not use complex backgrounds.
-    - **Transformation**: The design must be functional and wearable, yet clearly retain the "soul" or morphological characteristics of the input image.
-
+    VISUAL STYLE:
+    - 8K Resolution, Hyper-realistic, Macro Jewelry Photography.
+    - Lighting: Studio caustic lighting, emphasizing sparkle and metal sheen.
+    - Background: Soft neutral gradient (white/cream/pale grey). Elegant and clean.
+    
     OUTPUT REQUIREMENTS:
-    1. **Image**: Generate the visual design as specified.
-    2. **Text**: Provide a brief, elegant design concept description in Chinese (approx. 80-100 words). Describe the inspiration, how the input object was transformed, the interplay of materials, and the unique artistic qualities. Use poetic, luxury marketing language suitable for a high-end catalog.
+    1. IMAGE: The visual design.
+    2. TEXT: A sophisticated design concept description in CHINESE (中文). 
+       - Approx 80 words. 
+       - Use luxury marketing language (poetic, elegant).
+       - Explain the inspiration and how the input object's shape was interpreted.
 
     Return the image in the image part and the description in the text part.
   `;

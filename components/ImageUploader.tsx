@@ -1,5 +1,5 @@
 import React, { useCallback, useRef } from 'react';
-import { Plus, Image as ImageIcon, Camera } from 'lucide-react';
+import { Plus, Image as ImageIcon, Camera, Upload } from 'lucide-react';
 
 interface ImageUploaderProps {
   onImageSelected: (base64: string) => void;
@@ -54,7 +54,8 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageSelected, compact 
     return (
       <div 
         onClick={triggerFileSelect}
-        className="w-full h-full bg-stone-100 flex items-center justify-center relative hover:bg-stone-200 transition-colors cursor-pointer"
+        className="w-full h-full bg-stone-50 flex items-center justify-center relative hover:bg-stone-100 transition-colors cursor-pointer group"
+        title="更换图片"
       >
          <input 
           ref={fileInputRef}
@@ -63,7 +64,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageSelected, compact 
           onChange={handleFileChange} 
           className="hidden"
         />
-        <ImageIcon className="w-4 h-4 text-stone-400" />
+        <Upload className="w-4 h-4 text-stone-400 group-hover:text-stone-600 transition-colors" />
       </div>
     )
   }
@@ -71,10 +72,10 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageSelected, compact 
   return (
     <div 
       className={`
-        w-full h-full border-2 border-dashed border-stone-200 bg-white
-        hover:border-champagne-400/50 hover:bg-stone-50 transition-all duration-300 
-        group relative flex flex-col items-center justify-center rounded-2xl
-        shadow-sm hover:shadow-soft
+        w-full h-full border border-dashed border-stone-300 bg-stone-50/50
+        hover:border-champagne-400 hover:bg-white transition-all duration-500 
+        group relative flex flex-col items-center justify-center rounded-xl
+        shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)] hover:shadow-soft
       `}
       onDrop={handleDrop}
       onDragOver={handleDragOver}
@@ -95,37 +96,41 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageSelected, compact 
         className="hidden"
       />
       
-      <div className="z-10 text-center p-8 transform group-hover:-translate-y-1 transition-transform duration-300 flex flex-col items-center w-full">
-        <div className="relative w-16 h-16 mb-6 flex items-center justify-center rounded-full bg-stone-50 border border-stone-100 text-stone-300 group-hover:text-champagne-500 group-hover:border-champagne-200 transition-colors shadow-inner">
-           <Plus className="w-8 h-8" />
+      <div className="z-10 text-center p-8 transform transition-transform duration-500 flex flex-col items-center w-full max-w-sm">
+        
+        <div className="mb-6 relative">
+          <div className="absolute inset-0 bg-champagne-200 blur-2xl opacity-0 group-hover:opacity-40 transition-opacity duration-700 rounded-full"></div>
+          <div className="relative w-20 h-20 flex items-center justify-center rounded-full bg-white border border-stone-100 text-stone-300 group-hover:text-champagne-500 group-hover:border-champagne-200 transition-all duration-500 shadow-sm group-hover:shadow-lg group-hover:-translate-y-2">
+             <Plus className="w-8 h-8 font-thin" />
+          </div>
         </div>
         
-        <div className="space-y-2 mb-8">
-          <p className="text-stone-800 text-lg font-serif font-medium tracking-wide">上传参考图</p>
-          <p className="text-stone-400 text-xs font-light">
-            点击按钮上传或直接拍照
+        <div className="space-y-3 mb-10">
+          <h3 className="text-stone-900 text-xl font-serif font-medium tracking-wide">Upload Reference</h3>
+          <p className="text-stone-400 text-xs font-light tracking-wide">
+            上传或拍摄物品照片，AI 将为您赋予新生
           </p>
         </div>
 
-        <div className="flex gap-4 w-full max-w-xs justify-center">
+        <div className="grid grid-cols-2 gap-4 w-full px-8">
             <button
               onClick={triggerFileSelect}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-600 text-xs font-bold uppercase tracking-wider transition-colors"
+              className="flex flex-col items-center justify-center gap-2 py-4 px-2 rounded-lg border border-stone-200 bg-white hover:border-stone-400 hover:bg-stone-50 transition-all duration-300 group/btn"
             >
-              <ImageIcon className="w-4 h-4" />
-              相册
+              <ImageIcon className="w-5 h-5 text-stone-400 group-hover/btn:text-stone-800 transition-colors" />
+              <span className="text-[10px] font-bold uppercase tracking-widest text-stone-500 group-hover/btn:text-stone-800">Gallery</span>
             </button>
             <button
               onClick={triggerCamera}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-stone-900 hover:bg-stone-800 text-white text-xs font-bold uppercase tracking-wider transition-colors shadow-lg shadow-stone-900/20"
+              className="flex flex-col items-center justify-center gap-2 py-4 px-2 rounded-lg border border-stone-200 bg-white hover:border-champagne-400 hover:bg-champagne-50/10 transition-all duration-300 group/btn"
             >
-              <Camera className="w-4 h-4" />
-              拍照
+              <Camera className="w-5 h-5 text-stone-400 group-hover/btn:text-champagne-600 transition-colors" />
+              <span className="text-[10px] font-bold uppercase tracking-widest text-stone-500 group-hover/btn:text-champagne-600">Camera</span>
             </button>
         </div>
         
-        <p className="text-stone-300 text-[10px] font-light mt-6 select-none">
-          或者拖拽图片至此区域
+        <p className="text-stone-300 text-[10px] font-light mt-8 select-none opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+          Drop your image here
         </p>
       </div>
     </div>
