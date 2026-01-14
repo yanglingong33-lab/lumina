@@ -54,9 +54,10 @@ function App() {
         setSettings(JSON.parse(savedSettings));
       } else {
         // Initialize with default/env values if available, but keep editable
+        // Use hardcoded fallback for Base URL if not present
         setSettings({
           apiKey: process.env.API_KEY || '',
-          baseUrl: '',
+          baseUrl: 'https://api.apimart.ai',
           modelName: ''
         });
       }
@@ -116,7 +117,16 @@ function App() {
       setGeneratedDescription(result.description);
       setAppState('RESULT');
     } catch (err: any) {
-      setError(err.message || '生成设计时出现问题，请重试。');
+      let msg = err.message || '生成设计时出现问题，请重试。';
+      
+      // Auto-open settings if specific AUTH error occurs
+      if (msg.includes("AUTH_ERROR")) {
+        setIsSettingsOpen(true);
+        // Clean message for display
+        msg = msg.replace("AUTH_ERROR: ", "");
+      }
+      
+      setError(msg);
       setAppState('CONFIGURING');
     } finally {
       setIsGenerating(false);

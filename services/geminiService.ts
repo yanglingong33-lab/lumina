@@ -2,6 +2,9 @@
 import { GoogleGenAI } from "@google/genai";
 import { DesignConfig, GenerationResult, AppSettings } from "../types";
 
+// User provided default (stripped of suffix)
+const DEFAULT_BASE_URL = "https://api.apimart.ai";
+
 /**
  * Generates a jewelry design based on an input image and configuration.
  */
@@ -11,7 +14,7 @@ export const generateJewelryDesign = async (
 ): Promise<GenerationResult> => {
   // 1. Try to get settings from Local Storage (User configured)
   let apiKey = process.env.API_KEY;
-  let baseUrl: string | undefined = undefined;
+  let baseUrl: string = DEFAULT_BASE_URL;
   let modelName = 'gemini-3-pro-image-preview'; // Default
 
   try {
@@ -22,30 +25,7 @@ export const generateJewelryDesign = async (
         apiKey = parsed.apiKey.trim();
       }
       if (parsed.baseUrl && parsed.baseUrl.trim()) {
-        let rawUrl = parsed.baseUrl.trim();
-        // Remove trailing slashes
-        rawUrl = rawUrl.replace(/\/+$/, '');
-        
-        // Intelligent cleaning of the Base URL
-        // We want the root or the path prefix before /v1beta
-        // Common patterns: 
-        // https://api.proxy.com/v1 -> remove /v1
-        // https://api.proxy.com/google -> keep /google
-        // https://api.proxy.com -> keep as is
-        
-        if (rawUrl.endsWith('/v1')) {
-          rawUrl = rawUrl.substring(0, rawUrl.length - 3);
-        } else if (rawUrl.endsWith('/v1beta/models')) {
-           rawUrl = rawUrl.split('/v1beta/models')[0];
-        } else if (rawUrl.endsWith('/v1beta')) {
-           rawUrl = rawUrl.substring(0, rawUrl.length - 7);
-        } else if (rawUrl.includes('/images/generations')) {
-           rawUrl = rawUrl.split('/v1/images')[0];
-        } else if (rawUrl.includes('/chat/completions')) {
-           rawUrl = rawUrl.split('/v1/chat')[0];
-        }
-        
-        baseUrl = rawUrl;
+        baseUrl = parsed.baseUrl.trim();
       }
       if (parsed.modelName && parsed.modelName.trim()) {
         modelName = parsed.modelName.trim();
@@ -55,8 +35,36 @@ export const generateJewelryDesign = async (
     console.warn("Failed to read settings", e);
   }
 
+  // --- CLEAN BASE URL LOGIC ---
+  // Applies to both user input and default to ensure correctness
+  if (baseUrl) {
+    let rawUrl = baseUrl;
+    // Remove trailing slashes
+    rawUrl = rawUrl.replace(/\/+$/, '');
+    
+    // Intelligent cleaning of the Base URL
+    if (rawUrl.endsWith('/v1')) {
+      rawUrl = rawUrl.substring(0, rawUrl.length - 3);
+    } else if (rawUrl.endsWith('/v1beta/models')) {
+       rawUrl = rawUrl.split('/v1beta/models')[0];
+    } else if (rawUrl.endsWith('/v1beta')) {
+       rawUrl = rawUrl.substring(0, rawUrl.length - 7);
+    } else if (rawUrl.includes('/images/generations')) {
+       rawUrl = rawUrl.split('/v1/images')[0];
+    } else if (rawUrl.includes('/chat/completions')) {
+       rawUrl = rawUrl.split('/v1/chat')[0];
+    }
+    baseUrl = rawUrl;
+  }
+
   if (!apiKey) {
     throw new Error("未配置 API Key。请在设置中输入您的密钥。");
+  }
+
+  // --- CRITICAL CHECK FOR PROXY KEYS ---
+  const isSkKey = apiKey.startsWith('sk-');
+  if (isSkKey && !baseUrl) {
+    throw new Error("检测到以 'sk-' 开头的第三方密钥。请点击右上角设置图标，在 'Base URL' 中填写中转服务地址。");
   }
 
   // Extract mime type and clean base64 data
@@ -94,7 +102,8 @@ export const generateJewelryDesign = async (
 
   // --- STRATEGY SELECTION ---
   
-  if (baseUrl) {
+  if (baseUrl || isSkKey) {
+    // Force proxy mode if baseUrl exists OR if it's an sk- key
     return await generateViaProxy(baseUrl, apiKey, prompt, cleanBase64, mimeType, config, modelName);
   } else {
     return await generateViaSDK(apiKey, prompt, cleanBase64, mimeType, config, modelName);
@@ -114,11 +123,6 @@ async function generateViaSDK(
 ): Promise<GenerationResult> {
   const ai = new GoogleGenAI({ apiKey });
   
-  // Strategy: 
-  // 1. Try with full config (imageSize + aspectRatio)
-  // 2. If 400, try without imageSize
-  // 3. If 400, try without aspectRatio (minimal config)
-
   const makeConfig = (level: 'full' | 'no-size' | 'minimal') => {
     const imgConfig: any = {};
     if (level !== 'minimal') {
@@ -228,7 +232,14 @@ async function generateViaProxy(
       let errJson;
       try { errJson = JSON.parse(errText); } catch(e) {}
       
-      const errorMessage = errJson?.error?.message || errText || `HTTP ${response.status}`;
+      // Robust error extraction for various proxy response formats
+      const errorMessage = 
+        errJson?.error?.message || 
+        errJson?.message || 
+        errJson?.msg || 
+        (typeof errJson === 'string' ? errJson : errText) || 
+        `HTTP ${response.status}`;
+
       throw { 
         status: response.status, 
         message: errorMessage 
@@ -243,6 +254,45 @@ async function generateViaProxy(
     return await performFetch(makePayload('full'));
   } catch (error: any) {
     console.warn("Proxy Full Config Failed:", error.message);
+    
+    // Check for 404. If the default 3-pro fails, many proxies support 2.0-flash-exp or 2.5-flash-image
+    if (error.status === 404 && modelName.includes('gemini-3')) {
+       console.warn("Gemini 3 Pro not found on proxy, attempting fallback to gemini-2.0-flash-exp...");
+       const fallbackModel = 'gemini-2.0-flash-exp';
+       const fallbackUrl = `${baseUrl}/v1beta/models/${fallbackModel}:generateContent?key=${apiKey}`;
+       
+       // Fallback fetch function
+       const performFallback = async () => {
+         const payload = makePayload('no-size'); // safer config for older models
+         const response = await fetch(fallbackUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${apiKey}`,
+              'x-goog-api-key': apiKey
+            },
+            body: JSON.stringify(payload)
+         });
+         if (!response.ok) {
+            const errText = await response.text();
+            throw { status: response.status, message: errText };
+         }
+         const data = await response.json();
+         return parseResponse(data);
+       };
+
+       try {
+         return await performFallback();
+       } catch (fallbackError) {
+         // If fallback also fails, throw original 404 error but with hint
+         throw new Error(`404 错误: 您的代理服务商似乎不支持 gemini-3-pro 或 gemini-2.0-flash-exp。请联系服务商确认支持的画图模型。`);
+       }
+    }
+
+    if (error.status === 404) {
+      throw new Error(`404 错误: 找不到模型或接口地址错误。当前请求地址: ${url}。请检查 Base URL。`);
+    }
+
     if (isRetryable400(error)) {
       try {
         console.warn("Retrying without imageSize...");
@@ -268,7 +318,7 @@ async function generateViaProxy(
 }
 
 function isRetryable400(error: any) {
-  return error.status === 400 || (error.message && error.message.includes('INVALID_ARGUMENT'));
+  return error.status === 400 || (error.message && (error.message.includes('INVALID_ARGUMENT') || error.message.includes('400')));
 }
 
 /**
@@ -317,18 +367,36 @@ function parseResponse(response: any): GenerationResult {
  * Common error handler
  */
 function handleError(error: any) {
-  console.error("Gemini Generation Error:", error);
+  // Enhanced logging for object debugging
+  if (typeof error === 'object' && error !== null) {
+      console.error("Gemini Generation Error Details:", JSON.stringify(error, null, 2));
+  } else {
+      console.error("Gemini Generation Error:", error);
+  }
     
   let errorMessage = "生成设计时出现问题。";
+  const msgLower = (error.message || '').toLowerCase();
   
   // Check for fetch failures (often Network errors or CORS)
   if (error instanceof TypeError && error.message.includes("Failed to fetch")) {
     errorMessage = "网络请求失败。如果您在中国大陆，请检查 VPN 连接或配置正确的 Base URL 代理地址。";
-  } else if (error.status === 400 && (error.message?.includes("API key not valid") || error.message?.includes("INVALID_ARGUMENT"))) {
-     errorMessage = "API 密钥或参数无效 (400)。请检查：1. Base URL 是否正确 (无需 /v1 后缀)；2. API Key 是否有效。";
-  } else if (error.status === 404) {
-    errorMessage = `模型不存在 (404)。请在设置中修改 Model Name (如 gemini-2.0-flash-exp)。`;
-  } else if (error.message) {
+  } 
+  // Auth / Invalid Key Handling
+  else if (
+    error.status === 401 || 
+    error.status === 403 || 
+    msgLower.includes("api key not valid") || 
+    msgLower.includes("invalid_argument") ||
+    msgLower.includes("invalid token") ||
+    msgLower.includes("无效的令牌") ||
+    msgLower.includes("unauthenticated")
+  ) {
+     errorMessage = "AUTH_ERROR: API Key 无效或过期。请检查您的密钥额度或有效性。";
+  } 
+  else if (error.status === 404) {
+    errorMessage = `模型不存在或路径错误 (404)。请在设置中修改 Model Name，或检查 Base URL。`;
+  } 
+  else if (error.message) {
     errorMessage = `错误: ${error.message}`;
   }
 
