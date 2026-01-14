@@ -48,28 +48,59 @@ function App() {
 
   // Load settings on mount
   useEffect(() => {
+    const systemKey = process.env.API_KEY || '';
+    const defaultBaseUrl = 'https://api.apimart.ai';
+    const defaultModel = 'gemini-3-pro-image-preview'; // Default fallback
+
     try {
       const savedSettings = localStorage.getItem('lumina_settings');
       if (savedSettings) {
-        setSettings(JSON.parse(savedSettings));
+        const parsed = JSON.parse(savedSettings);
+        // If the saved key is empty OR the user is clearly using a dev build where we hardcoded a new key
+        // We gently suggest/update the key if it looks empty in storage but present in env
+        if (!parsed.apiKey && systemKey) {
+            setSettings({
+                apiKey: systemKey,
+                baseUrl: parsed.baseUrl || defaultBaseUrl,
+                modelName: parsed.modelName || defaultModel
+            });
+        } else {
+            setSettings(parsed);
+        }
       } else {
-        // Initialize with default/env values if available, but keep editable
-        // Use hardcoded fallback for Base URL if not present
+        // Initialize with default/env values
         setSettings({
-          apiKey: process.env.API_KEY || '',
-          baseUrl: 'https://api.apimart.ai',
-          modelName: ''
+          apiKey: systemKey,
+          baseUrl: defaultBaseUrl,
+          modelName: defaultModel
         });
       }
     } catch (e) {
       console.warn("Failed to load settings", e);
+      // Fallback
+      setSettings({
+        apiKey: systemKey,
+        baseUrl: defaultBaseUrl,
+        modelName: defaultModel
+      });
     }
   }, []);
 
   const handleSaveSettings = () => {
     localStorage.setItem('lumina_settings', JSON.stringify(settings));
     setIsSettingsOpen(false);
-    setError(null); // Clear previous errors as settings might fix them
+    setError(null); 
+  };
+  
+  const handleResetSettings = () => {
+      const defaultSettings = {
+          apiKey: process.env.API_KEY || '',
+          baseUrl: 'https://api.apimart.ai',
+          modelName: 'gemini-3-pro-image-preview'
+      };
+      setSettings(defaultSettings);
+      localStorage.setItem('lumina_settings', JSON.stringify(defaultSettings));
+      setError(null);
   };
 
   const [config, setConfig] = useState<DesignConfig>({
@@ -94,7 +125,7 @@ function App() {
   const handleGenerate = async () => {
     if (!originalImage) return;
     
-    // Validate Settings if process.env.API_KEY is missing
+    // Check key presence
     const currentApiKey = settings.apiKey || process.env.API_KEY;
     if (!currentApiKey) {
       setIsSettingsOpen(true);
@@ -457,18 +488,24 @@ function App() {
                     className="w-full bg-stone-50 border border-stone-200 rounded-lg px-4 py-3 text-sm focus:border-champagne-400 focus:ring-1 focus:ring-champagne-400/20 outline-none"
                    />
                    <p className="text-[10px] text-stone-400">
-                     默认: gemini-3-pro-image-preview。
-                     <br/>如果您的代理不支持，请尝试输入: <code>gemini-2.0-flash-exp</code> 或其他支持画图的模型。
+                     推荐: gemini-3-pro-image-preview 或 gemini-2.0-flash-exp。<br/>
+                     系统会自动尝试多个模型以确保成功。
                    </p>
                 </div>
              </div>
-             <div className="p-6 pt-2">
+             <div className="p-6 pt-2 space-y-3">
                <button 
                 onClick={handleSaveSettings}
                 className="w-full bg-stone-900 text-white py-3 rounded-lg font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-stone-800 transition-colors"
                >
                  <Save className="w-4 h-4" />
                  Save Configuration
+               </button>
+               <button 
+                onClick={handleResetSettings}
+                className="w-full bg-stone-100 text-stone-500 py-2.5 rounded-lg font-bold text-[10px] uppercase tracking-widest hover:bg-stone-200 transition-colors"
+               >
+                 恢复默认设置 (Reset Defaults)
                </button>
              </div>
           </div>
