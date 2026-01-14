@@ -1,3 +1,4 @@
+
 import { GoogleGenAI } from "@google/genai";
 import { DesignConfig, GenerationResult, AppSettings } from "../types";
 
@@ -11,6 +12,7 @@ export const generateJewelryDesign = async (
   // 1. Try to get settings from Local Storage (User configured)
   let apiKey = process.env.API_KEY;
   let baseUrl: string | undefined = undefined;
+  let modelName = 'gemini-2.5-flash-image'; // Default model
 
   try {
     const savedSettings = localStorage.getItem('lumina_settings');
@@ -21,11 +23,8 @@ export const generateJewelryDesign = async (
       }
       if (parsed.baseUrl && parsed.baseUrl.trim()) {
         let rawUrl = parsed.baseUrl.trim();
-        // Remove trailing slashes
         rawUrl = rawUrl.replace(/\/+$/, '');
         
-        // Clean up common path suffixes if user pasted a full endpoint
-        // e.g., https://api.proxy.com/v1/images/generations -> https://api.proxy.com
         if (rawUrl.includes('/images/generations')) {
            rawUrl = rawUrl.split('/v1/images')[0];
         } else if (rawUrl.includes('/chat/completions')) {
@@ -35,6 +34,9 @@ export const generateJewelryDesign = async (
         }
         
         baseUrl = rawUrl;
+      }
+      if (parsed.modelName && parsed.modelName.trim()) {
+        modelName = parsed.modelName.trim();
       }
     }
   } catch (e) {
@@ -80,14 +82,10 @@ export const generateJewelryDesign = async (
 
   // --- STRATEGY SELECTION ---
   
-  // If a custom Base URL is provided (implying a Proxy), use direct fetch.
-  // This is because proxies often require 'Authorization: Bearer sk-...' headers which the Google SDK 
-  // might not send by default (it prefers x-goog-api-key).
   if (baseUrl) {
-    return await generateViaProxy(baseUrl, apiKey, prompt, cleanBase64, mimeType);
+    return await generateViaProxy(baseUrl, apiKey, prompt, cleanBase64, mimeType, modelName);
   } else {
-    // Default: Use Official Google SDK
-    return await generateViaSDK(apiKey, prompt, cleanBase64, mimeType, config);
+    return await generateViaSDK(apiKey, prompt, cleanBase64, mimeType, config, modelName);
   }
 };
 
@@ -99,13 +97,14 @@ async function generateViaSDK(
   prompt: string, 
   base64Image: string, 
   mimeType: string,
-  config: DesignConfig
+  config: DesignConfig,
+  modelName: string
 ): Promise<GenerationResult> {
   const ai = new GoogleGenAI({ apiKey });
   
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-image', 
+      model: modelName, 
       contents: {
         parts: [
           { text: prompt },
@@ -122,7 +121,7 @@ async function generateViaSDK(
     return parseResponse(response);
   } catch (error: any) {
     handleError(error);
-    throw error; // Unreachable due to handleError throwing
+    throw error; 
   }
 }
 
@@ -134,13 +133,12 @@ async function generateViaProxy(
   apiKey: string,
   prompt: string,
   base64Image: string,
-  mimeType: string
+  mimeType: string,
+  modelName: string
 ): Promise<GenerationResult> {
   
   // Construct the Google-compatible endpoint on the proxy
-  // Most proxies map [BaseURL]/v1beta/models/[model]:generateContent
-  const model = 'gemini-2.5-flash-image';
-  const url = `${baseUrl}/v1beta/models/${model}:generateContent?key=${apiKey}`;
+  const url = `${baseUrl}/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
 
   const payload = {
     contents: [{
@@ -149,7 +147,6 @@ async function generateViaProxy(
         { inlineData: { mimeType: mimeType, data: base64Image } }
       ]
     }]
-    // Note: imageConfig is often dropped by some proxies, so we rely on the prompt for aspect ratio in this mode for safety.
   };
 
   try {
@@ -157,9 +154,7 @@ async function generateViaProxy(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        // CRITICAL: Send key as Bearer token for proxies expecting OpenAI-style auth
         'Authorization': `Bearer ${apiKey}`,
-        // ALSO send as x-goog-api-key for proxies expecting Google-style auth
         'x-goog-api-key': apiKey
       },
       body: JSON.stringify(payload)
@@ -178,9 +173,6 @@ async function generateViaProxy(
     }
 
     const data = await response.json();
-    
-    // Normalize data structure to match SDK response for parsing
-    // SDK returns object with 'candidates'. Raw JSON is typically the same.
     return parseResponse(data);
 
   } catch (error: any) {
@@ -196,7 +188,6 @@ function parseResponse(response: any): GenerationResult {
   let image = '';
   let description = '';
 
-  // Handle both SDK object and raw JSON object structures
   const candidates = response.candidates || response.response?.candidates;
   
   if (candidates && candidates[0]?.content?.parts) {
@@ -210,6 +201,10 @@ function parseResponse(response: any): GenerationResult {
   }
 
   if (!image) {
+    // Graceful fallback: If no image part, check if text part exists (user might have used a text-only model by mistake)
+    if (description) {
+      throw new Error("生成成功但仅返回了文本。您当前使用的模型不支持生成图片，请在设置中尝试更改 'Model Name' (例如 gemini-2.5-flash-image 或其他支持画图的模型)。");
+    }
     throw new Error("生成失败，API 未返回图片数据。");
   }
 
@@ -228,15 +223,9 @@ function handleError(error: any) {
   let errorMessage = "生成设计时出现问题。";
   
   if (error.status === 400 && (error.message?.includes("API key not valid") || error.message?.includes("INVALID_ARGUMENT"))) {
-     errorMessage = "API 密钥无效 (400)。请检查设置中的 Base URL 是否正确 (应为代理服务的根地址，如 https://api.proxy.com)。";
-  } else if (error.status === 401) {
-    errorMessage = "认证失败 (401)。请检查您的 API Key 是否正确。";
-  } else if (error.status === 403 || (error.message && error.message.includes("403"))) {
-    errorMessage = "权限被拒绝 (403)。密钥可能无效或余额不足。";
-  } else if (error.status === 429) {
-    errorMessage = "请求过于频繁，请稍后重试。";
+     errorMessage = "API 密钥或参数无效 (400)。请检查设置中的 Base URL。";
   } else if (error.status === 404) {
-    errorMessage = "找不到模型或路径 (404)。请检查代理 Base URL 配置。";
+    errorMessage = `模型不存在 (404)。请在设置中修改 Model Name，当前模型可能不被支持。`;
   } else if (error.message) {
     errorMessage = `错误: ${error.message}`;
   }

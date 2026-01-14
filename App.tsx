@@ -20,7 +20,8 @@ function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settings, setSettings] = useState<AppSettings>({
     apiKey: '',
-    baseUrl: ''
+    baseUrl: '',
+    modelName: ''
   });
 
   // Collection/Favorites State with Local Storage Persistence
@@ -55,7 +56,8 @@ function App() {
         // Initialize with default/env values if available, but keep editable
         setSettings({
           apiKey: process.env.API_KEY || '',
-          baseUrl: ''
+          baseUrl: '',
+          modelName: ''
         });
       }
     } catch (e) {
@@ -421,7 +423,6 @@ function App() {
                     placeholder="sk-..."
                     className="w-full bg-stone-50 border border-stone-200 rounded-lg px-4 py-3 text-sm focus:border-champagne-400 focus:ring-1 focus:ring-champagne-400/20 outline-none"
                    />
-                   <p className="text-[10px] text-stone-400">您的密钥将仅存储在本地浏览器中。</p>
                 </div>
                 
                 <div className="space-y-2">
@@ -433,7 +434,22 @@ function App() {
                     placeholder="https://api.apimart.ai"
                     className="w-full bg-stone-50 border border-stone-200 rounded-lg px-4 py-3 text-sm focus:border-champagne-400 focus:ring-1 focus:ring-champagne-400/20 outline-none"
                    />
-                   <p className="text-[10px] text-stone-400">如果您使用 API 代理，请在此输入基础地址 (例如: https://api.apimart.ai)。留空则使用 Google 官方地址。</p>
+                   <p className="text-[10px] text-stone-400">中转代理地址。留空则使用官方地址。</p>
+                </div>
+
+                <div className="space-y-2">
+                   <label className="text-xs font-bold uppercase tracking-widest text-stone-500">Model Name</label>
+                   <input 
+                    type="text" 
+                    value={settings.modelName || ''}
+                    onChange={(e) => setSettings({...settings, modelName: e.target.value})}
+                    placeholder="gemini-2.5-flash-image"
+                    className="w-full bg-stone-50 border border-stone-200 rounded-lg px-4 py-3 text-sm focus:border-champagne-400 focus:ring-1 focus:ring-champagne-400/20 outline-none"
+                   />
+                   <p className="text-[10px] text-stone-400">
+                     默认: gemini-2.5-flash-image。
+                     <br/>如果您的代理不支持，请尝试输入: <code>gemini-1.5-flash</code> 或 <code>gemini-2.0-flash-exp</code>
+                   </p>
                 </div>
              </div>
              <div className="p-6 pt-2">

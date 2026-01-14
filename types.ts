@@ -78,6 +78,7 @@ export interface DesignHistoryItem {
 export interface AppSettings {
   apiKey: string;
   baseUrl: string;
+  modelName?: string;
 }
 
 export type AppState = 'IDLE' | 'CONFIGURING' | 'GENERATING' | 'RESULT';
