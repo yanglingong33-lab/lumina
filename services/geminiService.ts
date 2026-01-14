@@ -1,5 +1,6 @@
+
 import { GoogleGenAI } from "@google/genai";
-import { DesignConfig, GenerationResult } from "../types";
+import { DesignConfig, GenerationResult, AppSettings } from "../types";
 
 /**
  * Generates a jewelry design based on an input image and configuration.
@@ -8,10 +9,47 @@ export const generateJewelryDesign = async (
   base64Image: string,
   config: DesignConfig
 ): Promise<GenerationResult> => {
-  // Initialize AI with the current key from process.env
-  // According to guidelines, we must use process.env.API_KEY directly.
-  // We create a new instance for each call to ensure we use the latest key (e.g. if selected via UI).
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  // 1. Try to get settings from Local Storage (User configured)
+  let apiKey = process.env.API_KEY;
+  let baseUrl: string | undefined = undefined;
+
+  try {
+    const savedSettings = localStorage.getItem('lumina_settings');
+    if (savedSettings) {
+      const parsed: AppSettings = JSON.parse(savedSettings);
+      if (parsed.apiKey && parsed.apiKey.trim()) {
+        apiKey = parsed.apiKey.trim();
+      }
+      if (parsed.baseUrl && parsed.baseUrl.trim()) {
+        // Clean the Base URL. If user pasted a full path like .../v1/images/generations, 
+        // we try to extract the base domain which is usually what the SDK expects.
+        // However, some proxies need the /v1beta/openai suffix. 
+        // For Google SDK, it usually expects the root.
+        let rawUrl = parsed.baseUrl.trim();
+        // Remove trailing slashes
+        rawUrl = rawUrl.replace(/\/+$/, '');
+        
+        // Simple heuristic: if it contains /images/generations (OpenAI endpoint), strip it
+        if (rawUrl.includes('/images/generations')) {
+           rawUrl = rawUrl.split('/v1/images')[0];
+        }
+        
+        baseUrl = rawUrl;
+      }
+    }
+  } catch (e) {
+    console.warn("Failed to read settings", e);
+  }
+
+  if (!apiKey) {
+    throw new Error("未配置 API Key。请在设置中输入您的密钥。");
+  }
+
+  // Initialize AI with the configured key and base URL
+  const ai = new GoogleGenAI({ 
+    apiKey: apiKey,
+    baseUrl: baseUrl // If undefined, SDK uses default Google URL
+  });
 
   // Extract mime type and clean base64 data
   const mimeMatch = base64Image.match(/^data:(image\/[a-zA-Z+]+);base64,/);
@@ -47,8 +85,6 @@ export const generateJewelryDesign = async (
   `;
 
   try {
-    // Switching to 'gemini-2.5-flash-image' as it is more widely available and stable for image generation 
-    // without requiring specific trusted tester permissions that might cause 403 errors on 'gemini-3-pro-image-preview'.
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash-image', 
       contents: {
@@ -66,7 +102,6 @@ export const generateJewelryDesign = async (
       },
       config: {
         imageConfig: {
-          // 'imageSize' is not supported by gemini-2.5-flash-image, handled via prompt instead.
           aspectRatio: config.aspectRatio || '1:1',
         },
       },
@@ -88,7 +123,7 @@ export const generateJewelryDesign = async (
     }
 
     if (!image) {
-      throw new Error("生成失败，API 未返回图片数据。请尝试更换图片或稍后重试。");
+      throw new Error("生成失败，API 未返回图片数据。");
     }
 
     return {
@@ -101,10 +136,16 @@ export const generateJewelryDesign = async (
     
     // Enhance error message for the user
     let errorMessage = "生成设计时出现问题。";
-    if (error.status === 403 || (error.message && error.message.includes("403"))) {
-      errorMessage = "API 权限被拒绝 (403)。请检查您的 API 密钥是否正确，或该密钥是否支持图像生成模型。";
+    
+    // Handle API Key / Proxy errors specifically
+    if (error.status === 400 && error.message?.includes("API key not valid")) {
+       errorMessage = "API 密钥无效 (400)。如果您使用代理/中转服务，请务必在设置中配置正确的 'Base URL'。";
+    } else if (error.status === 403 || (error.message && error.message.includes("403"))) {
+      errorMessage = "API 权限被拒绝 (403)。请检查您的密钥权限或余额。";
     } else if (error.status === 429) {
       errorMessage = "请求过于频繁，请稍后重试。";
+    } else if (error.status === 404) {
+      errorMessage = "无法连接到模型 (404)。请检查代理 Base URL 是否正确 (例如: https://api.proxy.com)。";
     } else if (error.message) {
       errorMessage = `错误: ${error.message}`;
     }

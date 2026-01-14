@@ -1,21 +1,12 @@
+
 import React, { useState, useEffect } from 'react';
-import { DesignConfig, MetalType, GemstoneType, JewelryType, ViewAngle, ImageSize, AspectRatio, AppState, DesignHistoryItem } from './types';
+import { DesignConfig, MetalType, GemstoneType, JewelryType, ViewAngle, ImageSize, AspectRatio, AppState, DesignHistoryItem, AppSettings } from './types';
 import { generateJewelryDesign } from './services/geminiService';
 import ComparisonSlider from './components/ComparisonSlider';
 import ConfigPanel from './components/ConfigPanel';
 import ImageUploader from './components/ImageUploader';
 import HistoryDrawer from './components/HistoryDrawer';
-import { Gem, Download, Trash2, Loader2, Sparkles, Heart, KeyRound } from 'lucide-react';
-
-// Declaration for AI Studio window object
-// Augment the AIStudio interface to include the required methods. 
-// This avoids conflict with existing Window.aistudio declaration.
-declare global {
-  interface AIStudio {
-    hasSelectedApiKey: () => Promise<boolean>;
-    openSelectKey: () => Promise<void>;
-  }
-}
+import { Gem, Download, Trash2, Loader2, Sparkles, Heart, Settings, X, Save } from 'lucide-react';
 
 function App() {
   const [appState, setAppState] = useState<AppState>('IDLE');
@@ -24,8 +15,14 @@ function App() {
   const [generatedDescription, setGeneratedDescription] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [needsApiKey, setNeedsApiKey] = useState(false);
   
+  // Settings State
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [settings, setSettings] = useState<AppSettings>({
+    apiKey: '',
+    baseUrl: ''
+  });
+
   // Collection/Favorites State with Local Storage Persistence
   const [history, setHistory] = useState<DesignHistoryItem[]>(() => {
     if (typeof window !== 'undefined') {
@@ -48,32 +45,28 @@ function App() {
     localStorage.setItem('lumina_collection', JSON.stringify(history));
   }, [history]);
 
-  // Check for AI Studio Key Selection
+  // Load settings on mount
   useEffect(() => {
-    const checkKey = async () => {
-      // If we already have a key from env/build config, we don't need to ask the user
-      // process.env.API_KEY is replaced by string literal at build time
-      if (process.env.API_KEY && process.env.API_KEY.length > 0) {
-        setNeedsApiKey(false);
-        return;
+    try {
+      const savedSettings = localStorage.getItem('lumina_settings');
+      if (savedSettings) {
+        setSettings(JSON.parse(savedSettings));
+      } else {
+        // Initialize with default/env values if available, but keep editable
+        setSettings({
+          apiKey: process.env.API_KEY || '',
+          baseUrl: ''
+        });
       }
-
-      if (window.aistudio) {
-        const hasKey = await window.aistudio.hasSelectedApiKey();
-        if (!hasKey) {
-          setNeedsApiKey(true);
-        }
-      }
-    };
-    checkKey();
+    } catch (e) {
+      console.warn("Failed to load settings", e);
+    }
   }, []);
 
-  const handleSelectKey = async () => {
-    if (window.aistudio) {
-      await window.aistudio.openSelectKey();
-      // Assume success to avoid race condition with hasSelectedApiKey
-      setNeedsApiKey(false);
-    }
+  const handleSaveSettings = () => {
+    localStorage.setItem('lumina_settings', JSON.stringify(settings));
+    setIsSettingsOpen(false);
+    setError(null); // Clear previous errors as settings might fix them
   };
 
   const [config, setConfig] = useState<DesignConfig>({
@@ -98,9 +91,11 @@ function App() {
   const handleGenerate = async () => {
     if (!originalImage) return;
     
-    // Check key again before generating
-    if (needsApiKey && window.aistudio) {
-      await handleSelectKey();
+    // Validate Settings if process.env.API_KEY is missing
+    const currentApiKey = settings.apiKey || process.env.API_KEY;
+    if (!currentApiKey) {
+      setIsSettingsOpen(true);
+      setError("请先配置 API Key");
       return;
     }
     
@@ -127,11 +122,7 @@ function App() {
   };
 
   const handleMainButtonClick = () => {
-    if (needsApiKey) {
-      handleSelectKey();
-    } else {
-      handleGenerate();
-    }
+     handleGenerate();
   };
 
   const handleToggleFavorite = () => {
@@ -223,15 +214,13 @@ function App() {
         </div>
 
         <div className="flex items-center gap-2">
-           {needsApiKey && (
-            <button 
-              onClick={handleSelectKey}
-              className="group flex items-center gap-2 px-4 py-2 rounded-full bg-champagne-100 text-champagne-900 hover:bg-champagne-200 transition-all text-xs font-bold uppercase tracking-widest mr-2"
-            >
-              <KeyRound className="w-4 h-4" />
-              <span>Connect AI Key</span>
-            </button>
-          )}
+          <button 
+            onClick={() => setIsSettingsOpen(true)}
+            className="p-2 rounded-full hover:bg-stone-100 text-stone-500 hover:text-stone-800 transition-all mr-1"
+            title="API 设置"
+          >
+            <Settings className="w-5 h-5" />
+          </button>
           
           <button 
             onClick={() => setIsHistoryOpen(true)}
@@ -386,11 +375,6 @@ function App() {
                       <Loader2 className="animate-spin w-4 h-4 text-champagne-400" />
                       正在生成...
                     </>
-                  ) : needsApiKey ? (
-                    <>
-                      <KeyRound className="w-4 h-4 text-champagne-400" />
-                      连接 AI 密钥
-                    </>
                   ) : (
                     <>
                       <Sparkles className="w-4 h-4 text-champagne-400" />
@@ -405,7 +389,7 @@ function App() {
 
       </main>
 
-      {/* Favorites Drawer (Previously History) */}
+      {/* Favorites Drawer */}
       <HistoryDrawer 
         isOpen={isHistoryOpen} 
         onClose={() => setIsHistoryOpen(false)} 
@@ -413,6 +397,57 @@ function App() {
         onSelect={handleSelectHistoryItem}
         onDelete={handleDeleteHistoryItem}
       />
+      
+      {/* Settings Modal */}
+      {isSettingsOpen && (
+        <div className="fixed inset-0 bg-stone-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-scale-in">
+             <div className="p-6 border-b border-stone-100 flex justify-between items-center bg-stone-50">
+                <div className="flex items-center gap-2">
+                  <Settings className="w-5 h-5 text-stone-600" />
+                  <h3 className="font-serif text-lg text-stone-800">API Configuration</h3>
+                </div>
+                <button onClick={() => setIsSettingsOpen(false)} className="text-stone-400 hover:text-stone-800">
+                  <X className="w-5 h-5" />
+                </button>
+             </div>
+             <div className="p-6 space-y-5">
+                <div className="space-y-2">
+                   <label className="text-xs font-bold uppercase tracking-widest text-stone-500">API Key</label>
+                   <input 
+                    type="password" 
+                    value={settings.apiKey}
+                    onChange={(e) => setSettings({...settings, apiKey: e.target.value})}
+                    placeholder="sk-..."
+                    className="w-full bg-stone-50 border border-stone-200 rounded-lg px-4 py-3 text-sm focus:border-champagne-400 focus:ring-1 focus:ring-champagne-400/20 outline-none"
+                   />
+                   <p className="text-[10px] text-stone-400">您的密钥将仅存储在本地浏览器中。</p>
+                </div>
+                
+                <div className="space-y-2">
+                   <label className="text-xs font-bold uppercase tracking-widest text-stone-500">Base URL (Proxy)</label>
+                   <input 
+                    type="text" 
+                    value={settings.baseUrl}
+                    onChange={(e) => setSettings({...settings, baseUrl: e.target.value})}
+                    placeholder="https://api.apimart.ai"
+                    className="w-full bg-stone-50 border border-stone-200 rounded-lg px-4 py-3 text-sm focus:border-champagne-400 focus:ring-1 focus:ring-champagne-400/20 outline-none"
+                   />
+                   <p className="text-[10px] text-stone-400">如果您使用 API 代理，请在此输入基础地址 (例如: https://api.apimart.ai)。留空则使用 Google 官方地址。</p>
+                </div>
+             </div>
+             <div className="p-6 pt-2">
+               <button 
+                onClick={handleSaveSettings}
+                className="w-full bg-stone-900 text-white py-3 rounded-lg font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-stone-800 transition-colors"
+               >
+                 <Save className="w-4 h-4" />
+                 Save Configuration
+               </button>
+             </div>
+          </div>
+        </div>
+      )}
       
       <style>{`
         .pb-safe {

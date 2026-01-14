@@ -1,3 +1,4 @@
+
 export enum MetalType {
   YellowGold = '18K 黄金',
   WhiteGold = '18K 白金',
@@ -72,6 +73,11 @@ export interface DesignHistoryItem {
   generatedImage: string;
   designDescription?: string;
   config: DesignConfig;
+}
+
+export interface AppSettings {
+  apiKey: string;
+  baseUrl: string;
 }
 
 export type AppState = 'IDLE' | 'CONFIGURING' | 'GENERATING' | 'RESULT';
