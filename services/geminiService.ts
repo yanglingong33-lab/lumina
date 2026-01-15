@@ -81,22 +81,25 @@ export const generateJewelryDesign = async (
   const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
   const cleanBase64 = base64Image.replace(/^data:image\/[a-zA-Z+]+;base64,/, '');
 
+  // Revised Prompt: Ask for text FIRST, then image. This often helps models that prioritize images to not skip text.
   const prompt = `
-    Role: World-class High Jewelry Designer.
-    Task: Transform the input image into a luxury jewelry design.
+    Role: World-class High Jewelry Designer (Haute Joaillerie).
+    Task: Create a design concept and then generate a luxury jewelry design image based on the input.
     
-    PARAMS:
+    STEP 1: CONCEPT (Text in Chinese)
+    Write a "Design Concept" (设计理念) in Chinese.
+    - Describe the inspiration, materials (${config.metal}, ${config.gemstone}), and the transformation.
+    - Tone: Poetic, sophisticated, luxury.
+    - Length: Around 100 words.
+    
+    STEP 2: VISUALIZATION (Image)
+    Generate the jewelry design image based on the concept.
     - Type: ${config.type}
-    - Material: ${config.metal}
-    - Main Stone: ${config.gemstone}
-    - Details: ${config.auxiliaryStone || 'Minimalist'}
-    - View: ${config.viewAngle}
-    - Concept: ${config.description}
-
-    REQUIREMENTS:
-    - Photorealistic, 8k resolution, studio lighting.
-    - OUTPUT: Image of the jewelry design.
-    - OUTPUT TEXT: Concept description in Chinese (中文).
+    - Perspective: ${config.viewAngle}
+    - Style: ${config.description || 'Elegant and modern'}
+    - Photorealistic, 8k, macro photography.
+    
+    IMPORTANT: You MUST return BOTH the text description and the generated image.
   `;
 
   // --- EXECUTION WITH FALLBACK ---
@@ -248,7 +251,6 @@ async function generateViaProxy(
   } catch (error: any) {
     
     // Check for Model Not Found / No Channel / 503 / 404
-    // "无可用渠道" often comes with 503 or 404
     const isModelMissing = 
         error.status === 404 || 
         error.status === 503 ||
@@ -262,25 +264,22 @@ async function generateViaProxy(
     if (isModelMissing) {
        console.warn(`Primary model ${modelName} failed. Attempting fallbacks...`);
        
-       // Filter out the primary model if it's in the fallback list to avoid duplicate retry
        const fallbackCandidates = FALLBACK_MODELS.filter(m => m !== modelName);
 
        for (const fallbackModel of fallbackCandidates) {
          try {
            console.log(`Trying fallback: ${fallbackModel}`);
-           // Use 'no-size' for fallbacks to be safer
            return await performFetch(fallbackModel, 'no-size');
          } catch (fbError: any) {
            console.warn(`Fallback ${fallbackModel} failed:`, fbError.message);
-           // Continue to next fallback
-           if (fbError.status === 401) throw fbError; // Don't retry auth errors
+           if (fbError.status === 401) throw fbError; 
          }
        }
        
        throw new Error(`无法找到可用的画图模型。尝试了: ${modelName}, ${fallbackCandidates.join(', ')}。请联系服务商或检查 API 配置。`);
     }
 
-    // Standard Retry for 400 errors (Config issues) on the primary model
+    // Standard Retry for 400 errors
     if (isRetryable400(error)) {
         return await performFetch(modelName, 'no-size');
     }
@@ -310,26 +309,34 @@ function parseResponse(response: any): GenerationResult {
     }
   }
 
-  // Fallback markdown parsing
+  // Fallback markdown parsing if needed
   if (!image && description) {
     const markdownImageRegex = /!\[.*?\]\((.*?)\)/;
     const match = description.match(markdownImageRegex);
     if (match && match[1]) {
       image = match[1];
-      description = description.replace(match[0], '').trim();
+      // Keep description, just remove the image tag
+      const descWithoutImg = description.replace(match[0], '').trim();
+      if (descWithoutImg) description = descWithoutImg;
     }
   }
 
   if (!image) {
     if (description) {
-      throw new Error("模型仅返回了文本。可能是所选模型不支持直接生成图片。");
+      throw new Error("模型仅返回了文本，未生成图片。可能是所选模型不支持同时生成。");
     }
     throw new Error("生成失败，API 返回数据为空。");
   }
 
+  // Soft clean description
+  description = description.trim();
+  // Remove Markdown headings if they exist at the very start
+  description = description.replace(/^#+\s*设计理念.*?\n/, '');
+  description = description.replace(/^\*\*设计理念.*?\*\*/, '');
+  
   return {
     image,
-    description: description.trim()
+    description: description || "（设计师未提供详细理念，但已为您完成设计）"
   };
 }
 
@@ -351,7 +358,6 @@ function handleError(error: any) {
     error.status === 403 || 
     msgLower.includes("api key not valid") || 
     msgLower.includes("invalid token") ||
-    msgLower.includes("无效的令牌") ||
     msgLower.includes("unauthenticated")
   ) {
      errorMessage = "AUTH_ERROR: API Key 无效或过期 (401)。请检查您的密钥额度。";

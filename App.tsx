@@ -56,8 +56,8 @@ function App() {
       const savedSettings = localStorage.getItem('lumina_settings');
       if (savedSettings) {
         const parsed = JSON.parse(savedSettings);
-        // If the saved key is empty OR the user is clearly using a dev build where we hardcoded a new key
-        // We gently suggest/update the key if it looks empty in storage but present in env
+        // If the saved key is empty, or if we want to ensure the system key is used if it's available and valid
+        // logic: if saved apiKey is empty, fill it with systemKey.
         if (!parsed.apiKey && systemKey) {
             setSettings({
                 apiKey: systemKey,
@@ -126,6 +126,7 @@ function App() {
     if (!originalImage) return;
     
     // Check key presence
+    // Priority: Settings Key > Environment/Hardcoded Key
     const currentApiKey = settings.apiKey || process.env.API_KEY;
     if (!currentApiKey) {
       setIsSettingsOpen(true);

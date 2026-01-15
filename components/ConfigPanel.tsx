@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { DesignConfig, MetalType, GemstoneType, JewelryType, ViewAngle, ImageSize, AspectRatio } from '../types';
-import { Loader2, Sparkles, ChevronDown, Quote, KeyRound } from 'lucide-react';
+import { Loader2, Sparkles, ChevronDown, Feather } from 'lucide-react';
 
 interface ConfigPanelProps {
   config: DesignConfig;
@@ -55,22 +55,39 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ config, setConfig, onGenerate
       
       {generatedDescription ? (
         <div className="animate-fade-in-up opacity-0 fill-mode-forwards">
-          <div className="p-6 bg-stone-900 text-stone-100 rounded-xl relative overflow-hidden shadow-2xl mb-4 group">
-            <div className="absolute top-0 right-0 p-4 opacity-10 transition-transform duration-700 group-hover:rotate-12">
-              <Sparkles className="w-24 h-24" />
-            </div>
-            <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-champagne-500/20 blur-3xl rounded-full"></div>
+          {/* Elegant Designer Note Card */}
+          <div className="relative bg-[#FFFCF9] border border-stone-200 rounded-lg shadow-[0_15px_30px_-10px_rgba(0,0,0,0.08)] mb-4 overflow-hidden">
+            {/* Top decorative accent */}
+            <div className="h-1 w-full bg-gradient-to-r from-stone-200 via-champagne-400 to-stone-200 opacity-50"></div>
             
-            <h3 className="text-champagne-300 font-serif text-lg mb-4 flex items-center gap-3 relative z-10">
-              <Sparkles className="w-4 h-4" />
-              <span className="tracking-widest text-sm">DESIGN CONCEPT</span>
-            </h3>
-            
-            <div className="relative z-10">
-              <Quote className="w-4 h-4 text-champagne-500/50 absolute -top-2 -left-2 transform -scale-x-100" />
-              <p className="text-sm font-light leading-loose tracking-wide opacity-90 text-justify indent-6">
-                {generatedDescription}
-              </p>
+            <div className="p-6 md:p-7 relative">
+               {/* Background Watermark */}
+               <div className="absolute right-[-20px] top-[-20px] opacity-[0.03] pointer-events-none transform rotate-12">
+                  <Feather className="w-40 h-40 text-stone-900" />
+               </div>
+
+               <div className="flex items-center gap-2 mb-4">
+                  <span className="h-px w-6 bg-champagne-400"></span>
+                  <h3 className="font-serif text-stone-900 text-lg tracking-wide italic">Design Concept</h3>
+                  <span className="h-px w-full bg-stone-100"></span>
+               </div>
+
+               <div className="relative z-10">
+                  <p className="font-serif text-stone-600 text-sm md:text-[15px] leading-8 text-justify tracking-wide first-letter:text-3xl first-letter:font-serif first-letter:text-champagne-500 first-letter:float-left first-letter:mr-2 first-letter:mt-[-5px]">
+                    {generatedDescription}
+                  </p>
+               </div>
+
+               <div className="mt-6 flex justify-between items-end border-t border-stone-100 pt-4">
+                  <div className="flex flex-col">
+                     <span className="text-[9px] text-stone-400 uppercase tracking-widest font-sans">Date</span>
+                     <span className="text-[10px] text-stone-600 font-serif">{new Date().toLocaleDateString()}</span>
+                  </div>
+                  <div className="flex flex-col items-end">
+                     <span className="text-[9px] text-stone-400 uppercase tracking-widest font-sans">Designed by</span>
+                     <span className="font-serif text-stone-800 text-xs italic">Lumina AI Atelier</span>
+                  </div>
+               </div>
             </div>
           </div>
           <div className="my-6 border-b border-stone-100"></div>
