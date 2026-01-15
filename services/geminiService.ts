@@ -7,24 +7,12 @@ const DEFAULT_BASE_URL = "https://api.apimart.ai";
 // Revert to the official stable preview as primary
 const DEFAULT_MODEL = "gemini-3-pro-image-preview"; 
 
-// Models to try if the primary one fails (in order of preference)
+// Models to try if the primary one fails (in order)
 const FALLBACK_MODELS = [
-  'gemini-2.0-flash',                // Latest stable fast model
-  'gemini-2.0-pro-exp-02-05',        // Latest pro experimental
-  'gemini-2.0-flash-thinking-exp-01-21',
-  'gemini-2.0-flash-exp',            // Older experimental
-  'gemini-exp-1206'                  // Legacy experimental
+  'gemini-2.0-flash-exp',
+  'gemini-exp-1206',
+  'gemini-2.0-flash-thinking-exp-01-21'
 ];
-
-const TYPE_TRANSLATIONS: Record<string, string> = {
-  '戒指': 'Ring',
-  '项链': 'Necklace',
-  '耳饰': 'Earrings',
-  '手镯': 'Bracelet',
-  '胸针': 'Brooch'
-};
-
-const getEnglishType = (type: string) => TYPE_TRANSLATIONS[type] || type;
 
 /**
  * Helper to get settings
@@ -75,7 +63,7 @@ export const generateJewelryDesign = async (
   // Revised Prompt for Maximum Realism
   const prompt = `
     Role: Senior Haute Joaillerie Designer & Luxury Product Photographer.
-    Task: Generate a high-fidelity photorealistic image of a museum-grade luxury jewelry piece based on the input image.
+    Task: Re-imagine the item in the image as a museum-grade luxury jewelry piece.
     
     STEP 1: DESIGN CONCEPT (Output in Chinese)
     Write a "设计理念" (Design Concept).
@@ -84,7 +72,7 @@ export const generateJewelryDesign = async (
     - Length: ~120 words.
     
     STEP 2: PHOTOREALISTIC VISUALIZATION
-    Generate the image with the following strictly enforced standards:
+    Render the design with the following strictly enforced photographic standards:
     - Subject: A single ${config.type} made of polished ${config.metal}, featuring high-grade ${config.gemstone} and ${config.auxiliaryStone || 'refined detailing'}.
     - Perspective: ${config.viewAngle}.
     - Lighting: Professional studio softbox lighting.
@@ -103,7 +91,6 @@ export const generateJewelryDesign = async (
 export const generateJewelryVariation = async (
   generatedImageBase64: string,
   mode: VariationMode,
-  itemType: string,
   refinePrompt?: string
 ): Promise<GenerationResult> => {
   const settings = getSettings();
@@ -116,28 +103,22 @@ export const generateJewelryVariation = async (
   let prompt = "";
   let aspectRatio = "1:1";
 
-  // Translate to English to ensure the model strictly follows the constraints
-  const itemTypeEn = getEnglishType(itemType);
-  const typeContext = itemType ? `The item is strictly a ${itemTypeEn}.` : "The item is a piece of jewelry.";
-
   switch (mode) {
     case VariationMode.REFINE:
       prompt = `
         Role: Senior Jewelry Designer.
-        Task: Generate an edited image of the jewelry based on the user's instruction.
-        Context: ${typeContext}
+        Task: Edit the jewelry in the input image based on the user's instruction.
         User Instruction: "${refinePrompt}"
         Requirements:
         - Keep the core composition and lighting of the input image similar unless asked to change.
         - Maintain photorealistic quality (8k, octane render).
-        - Ensure it remains a ${itemTypeEn} if not explicitly asked to change the type.
         - Output a short Chinese description of what was changed.
       `;
       break;
     case VariationMode.VIEWS:
       prompt = `
         Role: Technical Jewelry Illustrator & Photographer.
-        Task: Generate a technical multi-view composition image of the ${itemTypeEn} shown in the input image.
+        Task: Create a technical multi-view composition of the jewelry shown in the input image.
         Requirements:
         - Show 3 distinct views: Front View, Side View, and Top View.
         - Arrange them elegantly on a clean white or light grey background.
@@ -150,25 +131,11 @@ export const generateJewelryVariation = async (
     case VariationMode.MODEL:
       prompt = `
         Role: Fashion Photographer.
-        Task: Generate a photorealistic fashion photograph of the ${itemTypeEn} from the input image being worn by a model.
-        
-        CRITICAL RULES:
-        1. IDENTITY: The item is strictly a ${itemTypeEn}. Do NOT transform it into another type of jewelry.
-           - If Brooch: It MUST be pinned to the chest/lapel. NEVER around the neck.
-           - If Ring: It MUST be on a finger.
-        2. SCALE: Maintain realistic physical size.
-           - Brooch: 3-5cm. Small.
-           - Ring: ~2cm. Small.
-           - Do NOT make the item giant or disproportionate.
-        3. PLACEMENT:
-           - Brooch -> Chest/Lapel
-           - Ring -> Finger
-           - Necklace -> Neck
-           - Earrings -> Ears
-           
-        Visuals:
-        - Model: High fashion, elegant, realistic skin texture.
-        - Focus: Shallow depth of field, sharp focus on the ${itemTypeEn}.
+        Task: Show the jewelry from the input image being worn by a high-fashion model.
+        Requirements:
+        - The model should be elegant, skin texture realistic.
+        - Placement: Correct anatomical placement (e.g., ring on finger, necklace on neck).
+        - Focus: Shallow depth of field, focus on the jewelry.
         - Lighting: Cinematic fashion lighting.
         - Output description: "模特佩戴效果展示"
       `;
@@ -177,11 +144,9 @@ export const generateJewelryVariation = async (
     case VariationMode.PHOTO:
       prompt = `
         Role: Commercial Product Photographer.
-        Task: Generate an award-winning advertising photograph of the ${itemTypeEn} in the input image.
+        Task: Create an award-winning advertising shot of the jewelry in the input image.
         Requirements:
-        - Subject: ${typeContext} Do NOT change the item type.
-        - Props: Place the ${itemTypeEn} on a textured surface (marble, silk, or slate) or a floating pedestal.
-        - Scale: Ensure the item looks like its correct physical size (e.g. a ring is small, a necklace is larger).
+        - Props: Place it on a textured surface (marble, silk, or slate) or a floating pedestal.
         - Lighting: Dramatic, high-contrast 'Rembrandt' lighting or ethereal 'Rim' lighting.
         - Atmosphere: Luxury, expensive, sophisticated.
         - Output description: "商业摄影大片展示"
@@ -212,27 +177,18 @@ const executeGeneration = async (apiKey: string, baseUrl: string, prompt: string
   try {
     return await execute(apiKey, modelName);
   } catch (error: any) {
-    const errorMsg = error.message || '';
-    const isAuthError = (errorMsg.includes('AUTH_ERROR') || error.status === 401 || errorMsg.includes('无效的令牌') || errorMsg.includes('Invalid token'));
-    
-    if (isAuthError) {
-       // Fallback to system key if available and different
-       if (process.env.API_KEY && apiKey !== process.env.API_KEY) {
-          console.warn("Retrying with system default key...");
-          try {
-            return await execute(process.env.API_KEY, modelName);
-          } catch (retryError) { 
-             throw new Error("AUTH_ERROR: API Key 无效或过期，请检查设置。");
-          }
-       }
-       throw new Error("AUTH_ERROR: API Key 无效或过期，请检查设置。");
+    if ((error.message?.includes('AUTH_ERROR') || error.status === 401) && process.env.API_KEY) {
+       console.warn("Retrying with system default key...");
+       try {
+         return await execute(process.env.API_KEY, modelName);
+       } catch (retryError) { throw retryError; }
     }
     throw error;
   }
 };
 
 /**
- * Direct SDK Call
+ * Implementation using Official SDK
  */
 async function generateViaSDK(
   apiKey: string, 
@@ -253,9 +209,9 @@ async function generateViaSDK(
     return imgConfig;
   };
 
-  const doGenerate = async (targetModel: string, currentImageConfig: any) => {
+  const doGenerate = async (currentImageConfig: any) => {
     const response = await ai.models.generateContent({
-      model: targetModel, 
+      model: modelName, 
       contents: {
         parts: [
           { text: prompt },
@@ -270,23 +226,10 @@ async function generateViaSDK(
   };
 
   try {
-    return await doGenerate(modelName, makeConfig('full'));
+    return await doGenerate(makeConfig('full'));
   } catch (error: any) {
-    const isModelMissing = error.message && (error.message.includes('not found') || error.message.includes('404') || error.message.includes('503'));
-    
-    // SDK Fallback Logic
-    if (isModelMissing) {
-       console.warn(`Model ${modelName} failed (SDK). Attempting fallbacks...`);
-       const fallbackCandidates = FALLBACK_MODELS.filter(m => m !== modelName);
-       for (const fallbackModel of fallbackCandidates) {
-         try {
-           return await doGenerate(fallbackModel, {}); // Fallback models might not support imageConfig, safer to pass empty or minimal
-         } catch (fbError) { console.debug(`Fallback ${fallbackModel} failed:`, fbError); }
-       }
-    }
-  
     if (isRetryable400(error)) {
-        return await doGenerate(modelName, makeConfig('no-size'));
+        return await doGenerate(makeConfig('no-size'));
     }
     handleError(error);
     throw error; 
@@ -362,14 +305,9 @@ async function generateViaProxy(
        for (const fallbackModel of fallbackCandidates) {
          try {
            return await performFetch(fallbackModel, 'no-size');
-         } catch (fbError: any) { 
-            // If auth error on fallback, stop trying (key is definitely wrong)
-            if (fbError.message && (fbError.message.includes('401') || fbError.message.includes('INVALID_ARGUMENT'))) {
-              console.warn(`Fallback ${fallbackModel} auth/arg error.`);
-            }
-         }
+         } catch (fbError: any) { if (fbError.message && fbError.message.includes('401')) throw fbError; }
        }
-       throw new Error(`无法找到可用的画图模型 (已尝试: ${[modelName, ...fallbackCandidates].join(', ')})。请检查 API 设置。`);
+       throw new Error(`无法找到可用的画图模型。`);
     }
 
     if (isRetryable400(error)) return await performFetch(modelName, 'no-size');
@@ -405,13 +343,7 @@ function parseResponse(response: any): GenerationResult {
     }
   }
 
-  if (!image) {
-    if (description && description.trim().length > 0) {
-       console.warn("Model returned text instead of image:", description);
-       throw new Error(`生成被拒绝: ${description.slice(0, 60)}${description.length > 60 ? '...' : ''}`);
-    }
-    throw new Error("API 返回数据为空，未生成图片。");
-  }
+  if (!image) throw new Error("API 返回数据为空，未生成图片。");
 
   return {
     image,
