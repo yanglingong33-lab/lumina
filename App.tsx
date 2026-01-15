@@ -242,24 +242,25 @@ function App() {
   };
 
   return (
-    <div className="h-screen w-full bg-stone-50 text-stone-800 flex flex-col font-sans overflow-hidden">
+    // Use 100dvh for better mobile browser support (address bar handling)
+    <div className="h-[100dvh] w-full bg-stone-50 text-stone-800 flex flex-col font-sans overflow-hidden">
       
       {/* Header */}
-      <header className="h-16 md:h-20 absolute top-0 left-0 right-0 z-30 flex items-center justify-between px-6 md:px-10 bg-white/80 backdrop-blur-md border-b border-stone-100/50">
-        <div className="flex items-center gap-3">
+      <header className="h-14 md:h-20 absolute top-0 left-0 right-0 z-30 flex items-center justify-between px-4 md:px-10 bg-white/80 backdrop-blur-md border-b border-stone-100/50 transition-all">
+        <div className="flex items-center gap-2 md:gap-3">
           <div className="text-champagne-400 p-1.5 rounded-full bg-stone-50 border border-stone-200">
             <Gem className="w-5 h-5 md:w-6 md:h-6 animate-pulse-slow" />
           </div>
           <div className="flex flex-col md:flex-row md:items-baseline md:gap-3">
-            <h1 className="text-xl md:text-2xl font-serif font-bold text-stone-900 tracking-wide">LUMINA</h1>
+            <h1 className="text-lg md:text-2xl font-serif font-bold text-stone-900 tracking-wide">LUMINA</h1>
             <span className="text-[10px] text-stone-400 uppercase tracking-[0.2em] font-medium hidden md:inline-block">Haute Joaillerie AI</span>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 md:gap-2">
           <button 
             onClick={() => setIsSettingsOpen(true)}
-            className="p-2 rounded-full hover:bg-stone-100 text-stone-500 hover:text-stone-800 transition-all mr-1"
+            className="p-2.5 rounded-full hover:bg-stone-100 text-stone-500 hover:text-stone-800 transition-all active:scale-95"
             title="API 设置"
           >
             <Settings className="w-5 h-5" />
@@ -267,7 +268,7 @@ function App() {
           
           <button 
             onClick={() => setIsHistoryOpen(true)}
-            className="group flex items-center gap-2 px-4 py-2 rounded-full hover:bg-stone-100 transition-all text-stone-500 hover:text-stone-800"
+            className="group flex items-center gap-2 px-3 py-2 md:px-4 rounded-full hover:bg-stone-100 transition-all text-stone-500 hover:text-stone-800 active:scale-95"
           >
             <Heart className="w-5 h-5 group-hover:scale-110 group-hover:text-red-400 transition-all duration-300" />
             <span className="hidden md:inline text-xs font-bold uppercase tracking-widest">我的收藏</span>
@@ -276,21 +277,23 @@ function App() {
       </header>
 
       {/* Main Layout */}
-      <main className="flex-1 flex flex-col md:flex-row h-full pt-16 md:pt-20">
+      <main className="flex-1 flex flex-col md:flex-row h-full pt-14 md:pt-20">
         
         {/* Top/Left Panel: Visual Workspace */}
+        {/* Mobile: Dynamic height based on content, but capped to allow space for controls */}
         <div className={`
           relative transition-all duration-700 cubic-bezier(0.16, 1, 0.3, 1)
           w-full md:flex-1 bg-stone-50
-          ${originalImage ? 'h-[40vh] md:h-auto' : 'h-full'} 
+          ${originalImage ? 'h-[45vh] md:h-auto shrink-0' : 'h-full'} 
           flex flex-col items-center justify-center
+          border-b md:border-b-0 md:border-r border-stone-100
         `}>
           {/* Subtle Background Pattern */}
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_#ffffff_0%,_#f5f5f4_100%)] opacity-80" />
           
-          <div className="relative w-full h-full p-6 md:p-12 flex items-center justify-center z-10">
+          <div className="relative w-full h-full p-4 md:p-12 flex items-center justify-center z-10">
             {!originalImage ? (
-              <div className="w-full max-w-md aspect-square md:aspect-auto md:h-[500px] animate-fade-in-up">
+              <div className="w-full max-w-sm md:max-w-md aspect-square md:aspect-auto md:h-[500px] animate-fade-in-up px-4">
                  <ImageUploader onImageSelected={handleImageSelected} />
               </div>
             ) : (
@@ -299,8 +302,8 @@ function App() {
                     <ComparisonSlider originalImage={originalImage} generatedImage={generatedImage} />
                   ) : (
                     <>
-                      <img src={originalImage} alt="Reference" className="w-full h-full object-contain p-8 md:p-12 animate-fade-in" />
-                      <div className="absolute top-4 left-4 md:top-6 md:left-6 px-3 py-1 bg-white/90 backdrop-blur rounded-full text-[10px] font-bold tracking-widest text-stone-400 shadow-sm border border-stone-100 animate-fade-in-up delay-[200ms]">
+                      <img src={originalImage} alt="Reference" className="w-full h-full object-contain p-6 md:p-12 animate-fade-in" />
+                      <div className="absolute top-3 left-3 md:top-6 md:left-6 px-3 py-1 bg-white/90 backdrop-blur rounded-full text-[10px] font-bold tracking-widest text-stone-400 shadow-sm border border-stone-100 animate-fade-in-up delay-[200ms]">
                         ORIGINAL
                       </div>
                     </>
@@ -318,9 +321,10 @@ function App() {
           </div>
 
           {/* Floating Action Bar (Visuals) */}
+          {/* Mobile: Lifted up (bottom-4 -> bottom-2) inside the container to avoid overlap with sticky bottom bar */}
           {originalImage && (
-             <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3 z-20 animate-fade-in-up delay-[400ms]">
-               <div className="flex items-center gap-1 bg-white/90 backdrop-blur-xl border border-white/50 p-1.5 rounded-full shadow-soft ring-1 ring-stone-100">
+             <div className="absolute bottom-3 md:bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3 z-20 animate-fade-in-up delay-[400ms] w-max max-w-[90%]">
+               <div className="flex items-center gap-1 bg-white/90 backdrop-blur-xl border border-white/50 p-1.5 rounded-full shadow-[0_8px_30px_rgba(0,0,0,0.12)] ring-1 ring-stone-100">
                   <button 
                     onClick={handleClear}
                     title="Clear Workspace"
@@ -352,10 +356,11 @@ function App() {
                       <button 
                         onClick={handleDownload}
                         title="Download Image"
-                        className="ml-1 px-5 py-2.5 rounded-full bg-champagne-400 text-white hover:bg-champagne-500 shadow-lg shadow-champagne-400/30 text-xs font-bold uppercase tracking-widest flex items-center gap-2 transition-all transform hover:-translate-y-0.5 active:translate-y-0 active:shadow-sm"
+                        className="ml-1 px-4 py-2.5 md:px-5 rounded-full bg-champagne-400 text-white hover:bg-champagne-500 shadow-lg shadow-champagne-400/30 text-xs font-bold uppercase tracking-widest flex items-center gap-2 transition-all transform hover:-translate-y-0.5 active:translate-y-0 active:shadow-sm whitespace-nowrap"
                       >
                         <Download className="w-4 h-4" />
-                        保存图片
+                        <span className="hidden sm:inline">保存图片</span>
+                        <span className="sm:hidden">保存</span>
                       </button>
                     </>
                   )}
@@ -369,7 +374,7 @@ function App() {
           )}
 
            {error && (
-             <div className="absolute top-24 left-1/2 -translate-x-1/2 bg-red-50 text-red-600 px-6 py-3 rounded-xl shadow-lg border border-red-100 text-sm z-50 flex items-center gap-2 w-max max-w-[90%] animate-fade-in-up">
+             <div className="absolute top-4 md:top-24 left-1/2 -translate-x-1/2 bg-red-50 text-red-600 px-4 py-3 rounded-xl shadow-lg border border-red-100 text-xs md:text-sm z-50 flex items-center gap-2 w-max max-w-[90%] animate-fade-in-up">
                <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0 animate-pulse"></span>
                {error}
              </div>
@@ -378,14 +383,15 @@ function App() {
 
         {/* Bottom/Right Panel: Controls */}
         <div className={`
-          z-20 bg-white border-t md:border-t-0 md:border-l border-stone-100 shadow-[0_-10px_40px_rgba(0,0,0,0.03)]
-          md:w-[400px] md:relative
+          z-20 bg-white
+          md:w-[400px] md:relative md:border-l border-stone-100 md:shadow-[0_-10px_40px_rgba(0,0,0,0.03)]
           flex flex-col flex-1
           ${originalImage ? 'flex animate-slide-up' : 'hidden md:flex'}
           overflow-hidden
         `}>
           <div className="flex-1 overflow-hidden relative">
-            <div className="h-full overflow-y-auto custom-scrollbar p-6 md:p-8 pb-32 md:pb-8">
+            {/* Added larger bottom padding (pb-24) on mobile to clear the sticky button */}
+            <div className="h-full overflow-y-auto custom-scrollbar p-5 md:p-8 pb-28 md:pb-8">
                <ConfigPanel 
                  config={config} 
                  setConfig={setConfig} 
@@ -396,20 +402,20 @@ function App() {
                />
             </div>
             
-            {/* Desktop Decoration */}
+            {/* Desktop Bottom Fade */}
             <div className="hidden md:block absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-white to-transparent pointer-events-none" />
           </div>
 
           {/* Mobile Sticky Action Bar */}
           {originalImage && (
-            <div className="md:hidden absolute bottom-0 left-0 right-0 p-4 bg-white/95 backdrop-blur border-t border-stone-100 pb-safe z-30 shadow-[0_-5px_20px_rgba(0,0,0,0.05)] animate-slide-up">
+            <div className="md:hidden absolute bottom-0 left-0 right-0 p-4 pt-6 bg-gradient-to-t from-white via-white to-white/0 pb-safe z-30 animate-slide-up">
                <button
                 onClick={handleMainButtonClick}
                 disabled={isGenerating || !originalImage}
                 className={`
                   w-full relative overflow-hidden rounded-xl py-3.5
                   ${(!originalImage || isGenerating) ? 'bg-stone-100 text-stone-400 cursor-not-allowed' : 'bg-stone-900 text-white cursor-pointer active:scale-[0.98]'}
-                  font-bold tracking-widest text-sm transition-all duration-300 shadow-lg
+                  font-bold tracking-widest text-sm transition-all duration-300 shadow-[0_10px_30px_-5px_rgba(28,25,23,0.3)]
                 `}
               >
                 <span className="relative z-10 flex items-center justify-center gap-2">
@@ -462,7 +468,7 @@ function App() {
                     value={settings.apiKey}
                     onChange={(e) => setSettings({...settings, apiKey: e.target.value})}
                     placeholder="sk-..."
-                    className="w-full bg-stone-50 border border-stone-200 rounded-lg px-4 py-3 text-sm focus:border-champagne-400 focus:ring-1 focus:ring-champagne-400/20 outline-none"
+                    className="w-full bg-stone-50 border border-stone-200 rounded-lg px-4 py-3 text-base md:text-sm focus:border-champagne-400 focus:ring-1 focus:ring-champagne-400/20 outline-none"
                    />
                 </div>
                 
@@ -473,7 +479,7 @@ function App() {
                     value={settings.baseUrl}
                     onChange={(e) => setSettings({...settings, baseUrl: e.target.value})}
                     placeholder="https://api.apimart.ai"
-                    className="w-full bg-stone-50 border border-stone-200 rounded-lg px-4 py-3 text-sm focus:border-champagne-400 focus:ring-1 focus:ring-champagne-400/20 outline-none"
+                    className="w-full bg-stone-50 border border-stone-200 rounded-lg px-4 py-3 text-base md:text-sm focus:border-champagne-400 focus:ring-1 focus:ring-champagne-400/20 outline-none"
                    />
                    <p className="text-[10px] text-stone-400">中转代理地址。留空则使用官方地址。</p>
                 </div>
@@ -485,7 +491,7 @@ function App() {
                     value={settings.modelName || ''}
                     onChange={(e) => setSettings({...settings, modelName: e.target.value})}
                     placeholder="gemini-3-pro-image-preview"
-                    className="w-full bg-stone-50 border border-stone-200 rounded-lg px-4 py-3 text-sm focus:border-champagne-400 focus:ring-1 focus:ring-champagne-400/20 outline-none"
+                    className="w-full bg-stone-50 border border-stone-200 rounded-lg px-4 py-3 text-base md:text-sm focus:border-champagne-400 focus:ring-1 focus:ring-champagne-400/20 outline-none"
                    />
                    <p className="text-[10px] text-stone-400">
                      推荐: gemini-3-pro-image-preview 或 gemini-2.0-flash-exp。<br/>

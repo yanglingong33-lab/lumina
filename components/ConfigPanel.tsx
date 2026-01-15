@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { DesignConfig, MetalType, GemstoneType, JewelryType, ViewAngle, ImageSize, AspectRatio } from '../types';
 import { Loader2, Sparkles, ChevronDown, Quote, KeyRound } from 'lucide-react';
@@ -33,7 +34,7 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ config, setConfig, onGenerate
         <select
           value={config[field]}
           onChange={(e) => handleChange(field, e.target.value)}
-          className="w-full bg-white border border-stone-200 rounded-lg px-4 py-3 text-xs md:text-sm text-stone-800 font-medium appearance-none 
+          className="w-full bg-white border border-stone-200 rounded-lg px-4 py-3.5 md:py-3 text-base md:text-sm text-stone-800 font-medium appearance-none 
           hover:border-champagne-400 hover:shadow-lg hover:shadow-stone-200/40
           focus:outline-none focus:border-champagne-500 focus:ring-1 focus:ring-champagne-500/20
           transition-all duration-300 cursor-pointer"
@@ -43,14 +44,14 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ config, setConfig, onGenerate
           ))}
         </select>
         <div className="absolute inset-y-0 right-0 flex items-center px-4 pointer-events-none text-stone-400 transition-all duration-300 group-hover:text-champagne-500">
-          <ChevronDown className="w-3 h-3 md:w-4 md:h-4" />
+          <ChevronDown className="w-4 h-4" />
         </div>
       </div>
     </div>
   );
 
   return (
-    <div className="flex flex-col space-y-8 pb-8 md:pb-0">
+    <div className="flex flex-col space-y-8">
       
       {generatedDescription ? (
         <div className="animate-fade-in-up opacity-0 fill-mode-forwards">
@@ -76,7 +77,7 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ config, setConfig, onGenerate
         </div>
       ) : (
         <div className="space-y-2 animate-fade-in-up opacity-0 fill-mode-forwards" style={{ animationDelay: '0ms' }}>
-          <h2 className="text-3xl font-serif text-stone-900">Design Studio</h2>
+          <h2 className="text-2xl md:text-3xl font-serif text-stone-900">Design Studio</h2>
           <p className="text-xs text-stone-500 font-medium tracking-wide">CUSTOMIZE YOUR JEWELRY</p>
         </div>
       )}
@@ -108,7 +109,7 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ config, setConfig, onGenerate
                     key={opt}
                     onClick={() => handleChange('auxiliaryStone', opt)}
                     className={`
-                      text-[10px] px-3 py-1.5 rounded-full border transition-all duration-300
+                      text-[10px] md:text-[11px] px-3 py-2 md:py-1.5 rounded-full border transition-all duration-300
                       ${config.auxiliaryStone === opt 
                         ? 'bg-stone-800 text-white border-stone-800 shadow-md' 
                         : 'bg-white text-stone-500 border-stone-200 hover:border-champagne-400 hover:text-champagne-600'}
@@ -123,7 +124,7 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ config, setConfig, onGenerate
               value={config.auxiliaryStone}
               onChange={(e) => handleChange('auxiliaryStone', e.target.value)}
               placeholder="自定义描述 (选填)..."
-              className="w-full bg-white border border-stone-200 rounded-lg px-4 py-3 text-xs md:text-sm text-stone-700 
+              className="w-full bg-white border border-stone-200 rounded-lg px-4 py-3.5 md:py-3 text-base md:text-sm text-stone-700 
               focus:outline-none focus:border-champagne-500 focus:ring-1 focus:ring-champagne-500/20
               transition-all duration-300 placeholder-stone-300"
             />
@@ -139,14 +140,15 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ config, setConfig, onGenerate
               value={config.description}
               onChange={(e) => handleChange('description', e.target.value)}
               placeholder="描述您的设计灵感，例如：我想把这个形状做成一个复古风格的胸针，展现..."
-              className="w-full bg-white border border-stone-200 rounded-lg px-4 py-3 text-xs md:text-sm text-stone-700 
+              className="w-full bg-white border border-stone-200 rounded-lg px-4 py-3 text-base md:text-sm text-stone-700 
               focus:outline-none focus:border-champagne-500 focus:ring-1 focus:ring-champagne-500/20
-              transition-all duration-300 placeholder-stone-300 min-h-[100px] resize-none leading-relaxed"
+              transition-all duration-300 placeholder-stone-300 min-h-[120px] resize-none leading-relaxed"
             />
           </div>
         </div>
       </div>
 
+      {/* Desktop Generate Button */}
       <div className="pt-6 hidden md:block animate-fade-in-up opacity-0 fill-mode-forwards delay-[400ms]">
         <button
           onClick={onGenerate}

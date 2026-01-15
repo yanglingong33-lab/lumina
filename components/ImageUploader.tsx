@@ -1,3 +1,4 @@
+
 import React, { useCallback, useRef } from 'react';
 import { Plus, Image as ImageIcon, Camera, Upload } from 'lucide-react';
 
@@ -76,6 +77,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageSelected, compact 
         hover:border-champagne-400 hover:bg-white transition-all duration-500 
         group relative flex flex-col items-center justify-center rounded-xl
         shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)] hover:shadow-soft
+        min-h-[250px] md:min-h-0
       `}
       onDrop={handleDrop}
       onDragOver={handleDragOver}
@@ -96,40 +98,40 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageSelected, compact 
         className="hidden"
       />
       
-      <div className="z-10 text-center p-8 transform transition-transform duration-500 flex flex-col items-center w-full max-w-sm">
+      <div className="z-10 text-center p-6 md:p-8 transform transition-transform duration-500 flex flex-col items-center w-full max-w-sm">
         
-        <div className="mb-6 relative">
+        <div className="mb-4 md:mb-6 relative">
           <div className="absolute inset-0 bg-champagne-200 blur-2xl opacity-0 group-hover:opacity-40 transition-opacity duration-700 rounded-full"></div>
-          <div className="relative w-20 h-20 flex items-center justify-center rounded-full bg-white border border-stone-100 text-stone-300 group-hover:text-champagne-500 group-hover:border-champagne-200 transition-all duration-500 shadow-sm group-hover:shadow-lg group-hover:-translate-y-2">
-             <Plus className="w-8 h-8 font-thin" />
+          <div className="relative w-16 h-16 md:w-20 md:h-20 flex items-center justify-center rounded-full bg-white border border-stone-100 text-stone-300 group-hover:text-champagne-500 group-hover:border-champagne-200 transition-all duration-500 shadow-sm group-hover:shadow-lg group-hover:-translate-y-2">
+             <Plus className="w-6 h-6 md:w-8 md:h-8 font-thin" />
           </div>
         </div>
         
-        <div className="space-y-3 mb-10">
-          <h3 className="text-stone-900 text-xl font-serif font-medium tracking-wide">Upload Reference</h3>
-          <p className="text-stone-400 text-xs font-light tracking-wide">
+        <div className="space-y-2 md:space-y-3 mb-8 md:mb-10">
+          <h3 className="text-stone-900 text-lg md:text-xl font-serif font-medium tracking-wide">Upload Reference</h3>
+          <p className="text-stone-400 text-[10px] md:text-xs font-light tracking-wide">
             上传或拍摄物品照片，AI 将为您赋予新生
           </p>
         </div>
 
-        <div className="grid grid-cols-2 gap-4 w-full px-8">
+        <div className="grid grid-cols-2 gap-3 md:gap-4 w-full px-4 md:px-8">
             <button
               onClick={triggerFileSelect}
-              className="flex flex-col items-center justify-center gap-2 py-4 px-2 rounded-lg border border-stone-200 bg-white hover:border-stone-400 hover:bg-stone-50 transition-all duration-300 group/btn"
+              className="flex flex-col items-center justify-center gap-2 py-3 md:py-4 px-2 rounded-lg border border-stone-200 bg-white hover:border-stone-400 hover:bg-stone-50 transition-all duration-300 group/btn active:scale-95"
             >
-              <ImageIcon className="w-5 h-5 text-stone-400 group-hover/btn:text-stone-800 transition-colors" />
+              <ImageIcon className="w-4 h-4 md:w-5 md:h-5 text-stone-400 group-hover/btn:text-stone-800 transition-colors" />
               <span className="text-[10px] font-bold uppercase tracking-widest text-stone-500 group-hover/btn:text-stone-800">Gallery</span>
             </button>
             <button
               onClick={triggerCamera}
-              className="flex flex-col items-center justify-center gap-2 py-4 px-2 rounded-lg border border-stone-200 bg-white hover:border-champagne-400 hover:bg-champagne-50/10 transition-all duration-300 group/btn"
+              className="flex flex-col items-center justify-center gap-2 py-3 md:py-4 px-2 rounded-lg border border-stone-200 bg-white hover:border-champagne-400 hover:bg-champagne-50/10 transition-all duration-300 group/btn active:scale-95"
             >
-              <Camera className="w-5 h-5 text-stone-400 group-hover/btn:text-champagne-600 transition-colors" />
+              <Camera className="w-4 h-4 md:w-5 md:h-5 text-stone-400 group-hover/btn:text-champagne-600 transition-colors" />
               <span className="text-[10px] font-bold uppercase tracking-widest text-stone-500 group-hover/btn:text-champagne-600">Camera</span>
             </button>
         </div>
         
-        <p className="text-stone-300 text-[10px] font-light mt-8 select-none opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+        <p className="hidden md:block text-stone-300 text-[10px] font-light mt-8 select-none opacity-0 group-hover:opacity-100 transition-opacity duration-500">
           Drop your image here
         </p>
       </div>
