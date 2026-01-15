@@ -6,7 +6,7 @@ import ComparisonSlider from './components/ComparisonSlider';
 import ConfigPanel from './components/ConfigPanel';
 import ImageUploader from './components/ImageUploader';
 import HistoryDrawer from './components/HistoryDrawer';
-import { Gem, Download, Trash2, Loader2, Sparkles, Heart, Settings, X, Save, Wand2, Layers, User, Camera, Send, Edit, History } from 'lucide-react';
+import { Gem, Download, Trash2, Loader2, Sparkles, Heart, Settings, X, Save, Wand2, Layers, User, Camera, Send, Edit, History, ArrowLeft } from 'lucide-react';
 
 const LOADING_STEPS = ["Analyzing Geometry...", "Refining Details...", "Simulating Light...", "Mastering Texture..."];
 
@@ -294,7 +294,7 @@ function App() {
               <div className="flex flex-col w-full h-full gap-3 md:gap-4">
                  {/* Main Image Area */}
                  <div className="relative flex-1 w-full min-h-0 shadow-soft rounded-xl md:rounded-2xl overflow-hidden bg-white border border-stone-100 group">
-                    {appState === 'RESULT' && generatedImage ? (
+                    {generatedImage ? (
                         <ComparisonSlider originalImage={originalImage} generatedImage={generatedImage} />
                     ) : (
                       <>
@@ -314,14 +314,16 @@ function App() {
                     )}
 
                     {generatedImage && !isGenerating && (
-                      <div className="absolute top-3 right-3 flex flex-col gap-2">
+                      <div className="absolute top-3 right-3 flex flex-col gap-2 z-20">
                          <button onClick={() => setOriginalImage(null)} className="p-2 bg-white/90 backdrop-blur rounded-full text-stone-400 hover:text-red-500 shadow-sm"><Trash2 className="w-4 h-4" /></button>
                          <button onClick={() => handleDownload()} className="p-2 bg-stone-900 text-white rounded-full hover:bg-stone-700 shadow-sm"><Download className="w-4 h-4" /></button>
                       </div>
                     )}
                  </div>
 
-                 {/* Creative Studio / Variations Gallery - Fixed height on mobile */}
+                 {/* Creative Studio / Variations Gallery - Only show in RESULT mode to keep Config mode clean? Or always?
+                     Let's show it if we have variations and we are NOT in config mode, OR maybe just stick to RESULT mode for this.
+                  */}
                  {appState === 'RESULT' && !isGenerating && (
                    <div className="h-20 md:h-32 w-full flex-shrink-0 flex gap-2 md:gap-3 overflow-x-auto custom-scrollbar px-1 pb-1">
                       {variations.map((v) => (
@@ -405,12 +407,22 @@ function App() {
                      <button onClick={() => handleToggleFavorite()} className={`w-full py-3 rounded-xl border font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${isSaved ? 'bg-red-50 border-red-200 text-red-500' : 'border-stone-200 text-stone-600 hover:border-stone-400'}`}>
                         <Heart className={`w-4 h-4 ${isSaved ? 'fill-current' : ''}`} /> {isSaved ? '已收藏' : '收藏设计'}
                      </button>
-                     <button onClick={() => { setAppState('CONFIGURING'); setVariations([]); }} className="w-full py-3 text-stone-400 text-xs hover:text-stone-600">返回参数配置</button>
+                     <button onClick={() => setAppState('CONFIGURING')} className="w-full py-3 text-stone-400 text-xs hover:text-stone-600">返回参数配置</button>
                   </div>
                </div>
             ) : (
                /* Config Mode */
                <div className="p-5 md:p-8 pb-32 md:pb-8">
+                 {/* Back to Studio Button - Only if we have a generated image */}
+                 {generatedImage && (
+                    <button 
+                      onClick={() => setAppState('RESULT')}
+                      className="w-full mb-6 py-3 bg-stone-100 text-stone-600 rounded-xl font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-stone-200 transition-all border border-stone-200 hover:border-stone-300"
+                    >
+                       <Wand2 className="w-4 h-4 text-champagne-500" /> 返回创意工坊
+                    </button>
+                 )}
+
                  <ConfigPanel config={config} setConfig={setConfig} onGenerate={handleGenerate} isGenerating={isGenerating} disabled={!originalImage} generatedDescription={generatedDescription} />
                  
                  {/* Mobile Sticky Button - Positioned absolute to the scroll container or fixed to bottom of panel */}

@@ -250,32 +250,71 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ config, setConfig, onGenerate
           onClick={onGenerate}
           disabled={isGenerating || disabled}
           className={`
-            w-full relative overflow-hidden rounded-lg py-4
-            ${disabled ? 'bg-stone-100 text-stone-400 cursor-not-allowed' : 'text-white cursor-pointer hover:shadow-xl hover:shadow-stone-900/20 hover:-translate-y-0.5 active:scale-[0.99]'}
-            ${isGenerating ? 'bg-stone-900' : 'bg-stone-900'}
-            transition-all duration-500 group
+            group relative w-full overflow-hidden rounded-xl py-4
+            transition-all duration-500 ease-out
+            ${disabled 
+              ? 'bg-stone-100 cursor-not-allowed opacity-50' 
+              : 'bg-stone-900 cursor-pointer hover:shadow-[0_15px_40px_-10px_rgba(212,175,55,0.4)] hover:-translate-y-1 active:scale-[0.98]'
+            }
           `}
         >
-          {/* Animated Gradient Flow Background when generating */}
-          {isGenerating && (
-             <div className="absolute inset-0 bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.1),transparent)] bg-[length:200%_100%] animate-flow"></div>
+          {/* 1. Base Gradient Background */}
+          <div className={`absolute inset-0 transition-colors duration-500 ${disabled ? 'bg-stone-200' : 'bg-stone-900'}`}></div>
+
+          {/* 2. Advanced Ambient Glow (Idle) */}
+          {!disabled && !isGenerating && (
+            <>
+              {/* Bottom Gold Glow */}
+              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700 bg-[radial-gradient(circle_at_50%_150%,rgba(212,175,55,0.3),transparent_70%)]"></div>
+              {/* Subtle Shimmer */}
+              <div className="absolute inset-0 opacity-20 bg-[linear-gradient(115deg,transparent,rgba(255,255,255,0.1),transparent)] bg-[length:200%_100%] animate-shimmer"></div>
+            </>
           )}
-          
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000"></div>
-          
-          <span className="relative z-10 flex items-center justify-center gap-3">
+
+          {/* 3. Shine Sweep Effect (Hover) */}
+          {!disabled && !isGenerating && (
+             <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-in-out bg-gradient-to-r from-transparent via-white/10 to-transparent skew-x-12 z-10"></div>
+          )}
+
+          {/* 4. Generating State: Pulse & Flow */}
+          {isGenerating && (
+             <div className="absolute inset-0 z-0">
+               {/* Deep animated background */}
+               <div className="absolute inset-0 bg-stone-800 animate-pulse"></div>
+               {/* Moving Light Beam */}
+               <div className="absolute inset-0 bg-[linear-gradient(90deg,transparent,rgba(212,175,55,0.2),transparent)] bg-[length:50%_100%] animate-[shimmer_1.5s_infinite]"></div>
+             </div>
+          )}
+
+          {/* 5. Content Layer */}
+          <div className="relative z-20 flex items-center justify-center gap-3">
             {isGenerating ? (
               <>
-                <Loader2 className="animate-spin w-4 h-4 text-champagne-400" />
-                <span className="text-xs font-bold tracking-[0.2em] uppercase">Crafting Masterpiece...</span>
+                <div className="relative">
+                  <Loader2 className="w-5 h-5 text-champagne-400 animate-spin" />
+                  <div className="absolute inset-0 bg-champagne-400/30 blur-md animate-pulse"></div>
+                </div>
+                <span className="text-xs font-bold tracking-[0.25em] uppercase text-champagne-100">Crafting Masterpiece...</span>
               </>
             ) : (
               <>
-                <Sparkles className="w-4 h-4 text-champagne-400 group-hover:rotate-12 transition-transform duration-300" />
-                <span className="text-xs font-bold tracking-[0.2em] uppercase">{generatedDescription ? 'Regenerate Design' : 'Generate Design'}</span>
+                <div className={`
+                   p-1.5 rounded-full border border-white/10 bg-white/5 backdrop-blur-sm
+                   group-hover:bg-champagne-400 group-hover:border-transparent group-hover:text-stone-900 group-hover:scale-110 group-hover:rotate-12
+                   transition-all duration-500 ease-spring
+                `}>
+                   <Sparkles className={`w-4 h-4 ${disabled ? 'text-stone-400' : 'text-champagne-200 group-hover:text-stone-900'} transition-colors`} />
+                </div>
+                <span className={`
+                   text-xs font-bold tracking-[0.2em] uppercase
+                   ${disabled ? 'text-stone-400' : 'text-stone-200 group-hover:text-white'}
+                   transition-colors duration-300
+                `}>
+                   {generatedDescription ? 'Regenerate Design' : 'Generate Design'}
+                </span>
               </>
             )}
-          </span>
+          </div>
         </button>
       </div>
     </div>

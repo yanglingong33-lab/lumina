@@ -10,19 +10,30 @@ interface ComparisonSliderProps {
 const ComparisonSlider: React.FC<ComparisonSliderProps> = ({ originalImage, generatedImage }) => {
   const [sliderPosition, setSliderPosition] = useState(50);
   const [isResizing, setIsResizing] = useState(false);
-  const [containerWidth, setContainerWidth] = useState(0);
+  const [containerWidth, setContainerWidth] = useState<number>(0);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Update container width on resize or mount
+  // Use ResizeObserver to track container width changes accurately
+  // This solves the issue on Desktop/Tablet where flex layout transitions cause size mismatches
   useEffect(() => {
+    if (!containerRef.current) return;
+
     const updateWidth = () => {
       if (containerRef.current) {
         setContainerWidth(containerRef.current.offsetWidth);
       }
     };
+
+    // Initial measure
     updateWidth();
-    window.addEventListener('resize', updateWidth);
-    return () => window.removeEventListener('resize', updateWidth);
+
+    const resizeObserver = new ResizeObserver(() => {
+      updateWidth();
+    });
+
+    resizeObserver.observe(containerRef.current);
+
+    return () => resizeObserver.disconnect();
   }, []);
 
   const handlePointerDown = useCallback(() => {
@@ -75,7 +86,7 @@ const ComparisonSlider: React.FC<ComparisonSliderProps> = ({ originalImage, gene
 
       {/* Original Image (Foreground, clipped) - The Reference */}
       <div 
-        className="absolute top-0 left-0 h-full overflow-hidden bg-white z-10"
+        className="absolute top-0 left-0 h-full overflow-hidden bg-white z-10 border-r border-champagne-400/30"
         style={{ 
           width: `${sliderPosition}%`,
           transition: isResizing ? 'none' : 'width 0.1s ease-out'
@@ -83,7 +94,7 @@ const ComparisonSlider: React.FC<ComparisonSliderProps> = ({ originalImage, gene
       >
         <div 
           className="h-full"
-          style={{ width: containerWidth }}
+          style={{ width: containerWidth > 0 ? `${containerWidth}px` : '100%' }}
         >
           <img 
             src={originalImage} 
@@ -95,7 +106,7 @@ const ComparisonSlider: React.FC<ComparisonSliderProps> = ({ originalImage, gene
         {/* Label: Original - Adjusted for Mobile */}
         <div className="absolute bottom-4 left-4 md:bottom-8 md:left-8 flex items-center gap-2 transition-all duration-700 opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0">
           <div className="h-px w-4 md:w-6 bg-stone-300"></div>
-          <span className="bg-white/80 backdrop-blur-md text-stone-500 px-3 md:px-4 py-1.5 rounded-full text-[9px] md:text-xs font-serif italic tracking-wide border border-stone-200 shadow-sm">
+          <span className="bg-white/80 backdrop-blur-md text-stone-500 px-3 md:px-4 py-1.5 rounded-full text-[9px] md:text-xs font-serif italic tracking-wide border border-stone-200 shadow-sm whitespace-nowrap">
             原图参考
           </span>
         </div>
@@ -103,7 +114,7 @@ const ComparisonSlider: React.FC<ComparisonSliderProps> = ({ originalImage, gene
       
       {/* Label: Designed - Adjusted for Mobile */}
       <div className="absolute bottom-4 right-4 md:bottom-8 md:right-8 flex items-center gap-2 transition-all duration-700 opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 z-20">
-        <span className="bg-stone-900/90 backdrop-blur-md text-champagne-300 px-4 md:px-5 py-1.5 md:py-2 rounded-full text-[9px] md:text-xs font-serif font-bold tracking-wide shadow-glow border border-stone-800">
+        <span className="bg-stone-900/90 backdrop-blur-md text-champagne-300 px-4 md:px-5 py-1.5 md:py-2 rounded-full text-[9px] md:text-xs font-serif font-bold tracking-wide shadow-glow border border-stone-800 whitespace-nowrap">
           AI 珠宝方案
         </span>
         <div className="h-px w-4 md:w-6 bg-champagne-400/50"></div>
