@@ -68,7 +68,7 @@ export const generateJewelryDesign = async (
   }
 
   if (!apiKey) {
-    throw new Error("未配置 API Key。请在设置中输入您的密钥。");
+    throw new Error("AUTH_ERROR: 未配置 API Key。请在设置中输入您的密钥。");
   }
 
   const isSkKey = apiKey.startsWith('sk-');
@@ -81,7 +81,7 @@ export const generateJewelryDesign = async (
   const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
   const cleanBase64 = base64Image.replace(/^data:image\/[a-zA-Z+]+;base64,/, '');
 
-  // Revised Prompt: Ask for text FIRST, then image. This often helps models that prioritize images to not skip text.
+  // Revised Prompt
   const prompt = `
     Role: World-class High Jewelry Designer (Haute Joaillerie).
     Task: Create a design concept and then generate a luxury jewelry design image based on the input.
@@ -358,7 +358,8 @@ function handleError(error: any) {
     error.status === 403 || 
     msgLower.includes("api key not valid") || 
     msgLower.includes("invalid token") ||
-    msgLower.includes("unauthenticated")
+    msgLower.includes("unauthenticated") ||
+    msgLower.includes("无效的令牌")
   ) {
      errorMessage = "AUTH_ERROR: API Key 无效或过期 (401)。请检查您的密钥额度。";
   } 

@@ -8,6 +8,15 @@ import ImageUploader from './components/ImageUploader';
 import HistoryDrawer from './components/HistoryDrawer';
 import { Gem, Download, Trash2, Loader2, Sparkles, Heart, Settings, X, Save } from 'lucide-react';
 
+const LOADING_STEPS = [
+  "Analyzing Geometry...",
+  "Identifying Materials...",
+  "Sketching Concept...",
+  "Rendering Gold Texture...",
+  "Polishing Gemstones...",
+  "Finalizing Light & Shadow..."
+];
+
 function App() {
   const [appState, setAppState] = useState<AppState>('IDLE');
   const [originalImage, setOriginalImage] = useState<string | null>(null);
@@ -15,6 +24,7 @@ function App() {
   const [generatedDescription, setGeneratedDescription] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loadingStepIndex, setLoadingStepIndex] = useState(0);
   
   // Settings State
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -46,6 +56,18 @@ function App() {
     localStorage.setItem('lumina_collection', JSON.stringify(history));
   }, [history]);
 
+  // Loading Step Cycler
+  useEffect(() => {
+    let interval: any;
+    if (isGenerating) {
+      setLoadingStepIndex(0);
+      interval = setInterval(() => {
+        setLoadingStepIndex(prev => (prev + 1) % LOADING_STEPS.length);
+      }, 2500); // Change step every 2.5s
+    }
+    return () => clearInterval(interval);
+  }, [isGenerating]);
+
   // Load settings on mount
   useEffect(() => {
     const systemKey = process.env.API_KEY || '';
@@ -56,8 +78,6 @@ function App() {
       const savedSettings = localStorage.getItem('lumina_settings');
       if (savedSettings) {
         const parsed = JSON.parse(savedSettings);
-        // If the saved key is empty, or if we want to ensure the system key is used if it's available and valid
-        // logic: if saved apiKey is empty, fill it with systemKey.
         if (!parsed.apiKey && systemKey) {
             setSettings({
                 apiKey: systemKey,
@@ -68,7 +88,6 @@ function App() {
             setSettings(parsed);
         }
       } else {
-        // Initialize with default/env values
         setSettings({
           apiKey: systemKey,
           baseUrl: defaultBaseUrl,
@@ -77,7 +96,6 @@ function App() {
       }
     } catch (e) {
       console.warn("Failed to load settings", e);
-      // Fallback
       setSettings({
         apiKey: systemKey,
         baseUrl: defaultBaseUrl,
@@ -125,8 +143,6 @@ function App() {
   const handleGenerate = async () => {
     if (!originalImage) return;
     
-    // Check key presence
-    // Priority: Settings Key > Environment/Hardcoded Key
     const currentApiKey = settings.apiKey || process.env.API_KEY;
     if (!currentApiKey) {
       setIsSettingsOpen(true);
@@ -139,7 +155,6 @@ function App() {
     setAppState('GENERATING');
     setGeneratedDescription(null);
     
-    // Reset save state for new generation
     setIsSaved(false);
     setCurrentDesignId(null);
 
@@ -150,14 +165,10 @@ function App() {
       setAppState('RESULT');
     } catch (err: any) {
       let msg = err.message || '生成设计时出现问题，请重试。';
-      
-      // Auto-open settings if specific AUTH error occurs
       if (msg.includes("AUTH_ERROR")) {
         setIsSettingsOpen(true);
-        // Clean message for display
         msg = msg.replace("AUTH_ERROR: ", "");
       }
-      
       setError(msg);
       setAppState('CONFIGURING');
     } finally {
@@ -173,12 +184,10 @@ function App() {
     if (!originalImage || !generatedImage) return;
 
     if (isSaved && currentDesignId) {
-      // Remove from favorites
       setHistory(prev => prev.filter(item => item.id !== currentDesignId));
       setIsSaved(false);
       setCurrentDesignId(null);
     } else {
-      // Add to favorites
       const newId = Date.now().toString();
       const newHistoryItem: DesignHistoryItem = {
         id: newId,
@@ -198,8 +207,6 @@ function App() {
   const handleDeleteHistoryItem = (id: string, e: React.MouseEvent) => {
     e.stopPropagation(); 
     setHistory(prev => prev.filter(item => item.id !== id));
-    
-    // If the currently displayed item is deleted, update state
     if (id === currentDesignId) {
       setIsSaved(false);
       setCurrentDesignId(null);
@@ -243,7 +250,6 @@ function App() {
   };
 
   return (
-    // Use 100dvh for better mobile browser support (address bar handling)
     <div className="h-[100dvh] w-full bg-stone-50 text-stone-800 flex flex-col font-sans overflow-hidden">
       
       {/* Header */}
@@ -281,7 +287,6 @@ function App() {
       <main className="flex-1 flex flex-col md:flex-row h-full pt-14 md:pt-20">
         
         {/* Top/Left Panel: Visual Workspace */}
-        {/* Mobile: Dynamic height based on content, but capped to allow space for controls */}
         <div className={`
           relative transition-all duration-700 cubic-bezier(0.16, 1, 0.3, 1)
           w-full md:flex-1 bg-stone-50
@@ -310,11 +315,38 @@ function App() {
                     </>
                   )}
 
-                  {/* Loading Overlay */}
+                  {/* Sophisticated Loading Overlay */}
                   {isGenerating && (
-                    <div className="absolute inset-0 bg-white/60 backdrop-blur-md z-20 flex flex-col items-center justify-center animate-fade-in">
-                       <div className="w-12 h-12 md:w-16 md:h-16 rounded-full border-2 border-stone-200 border-t-champagne-400 animate-spin mb-4 md:mb-6"></div>
-                       <p className="text-stone-800 font-serif text-sm md:text-lg tracking-wider animate-pulse">正在精工细作...</p>
+                    <div className="absolute inset-0 bg-stone-50/80 backdrop-blur-md z-20 flex flex-col items-center justify-center animate-fade-in">
+                       
+                       {/* Scanning Line Effect */}
+                       <div className="absolute inset-0 pointer-events-none overflow-hidden opacity-30">
+                          <div className="w-full h-[2px] bg-gradient-to-r from-transparent via-champagne-400 to-transparent shadow-glow animate-scan absolute top-0"></div>
+                       </div>
+
+                       {/* Central Animated Logo */}
+                       <div className="relative mb-8">
+                         {/* Outer Ring */}
+                         <div className="w-20 h-20 md:w-24 md:h-24 rounded-full border border-stone-200 border-t-champagne-400 animate-spin-slow"></div>
+                         {/* Middle Pulse */}
+                         <div className="absolute inset-0 m-2 rounded-full border border-dashed border-stone-300 animate-spin-slow" style={{ animationDirection: 'reverse' }}></div>
+                         {/* Center Gem */}
+                         <div className="absolute inset-0 flex items-center justify-center">
+                           <Gem className="w-8 h-8 md:w-10 md:h-10 text-champagne-500 animate-pulse-slow drop-shadow-lg" />
+                         </div>
+                       </div>
+
+                       {/* Cycling Loading Text */}
+                       <div className="flex flex-col items-center space-y-2 h-16">
+                         <span className="font-serif text-lg md:text-xl text-stone-800 animate-fade-in-up key={loadingStepIndex}">
+                           {LOADING_STEPS[loadingStepIndex]}
+                         </span>
+                         <div className="flex gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-champagne-400 animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                            <span className="w-1.5 h-1.5 rounded-full bg-champagne-400 animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                            <span className="w-1.5 h-1.5 rounded-full bg-champagne-400 animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                         </div>
+                       </div>
                     </div>
                   )}
               </div>
@@ -322,7 +354,6 @@ function App() {
           </div>
 
           {/* Floating Action Bar (Visuals) */}
-          {/* Mobile: Lifted up (bottom-4 -> bottom-2) inside the container to avoid overlap with sticky bottom bar */}
           {originalImage && (
              <div className="absolute bottom-3 md:bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3 z-20 animate-fade-in-up delay-[400ms] w-max max-w-[90%]">
                <div className="flex items-center gap-1 bg-white/90 backdrop-blur-xl border border-white/50 p-1.5 rounded-full shadow-[0_8px_30px_rgba(0,0,0,0.12)] ring-1 ring-stone-100">
@@ -337,8 +368,6 @@ function App() {
                   {appState === 'RESULT' && (
                     <>
                       <div className="w-px h-6 bg-stone-200 mx-1"></div>
-                      
-                      {/* Favorite Button (Toggle) */}
                       <button
                         onClick={handleToggleFavorite}
                         title={isSaved ? "取消收藏" : "加入收藏"}
@@ -353,7 +382,6 @@ function App() {
                          <Heart className={`w-5 h-5 ${isSaved ? 'fill-current' : ''}`} />
                       </button>
 
-                      {/* Download Image Button */}
                       <button 
                         onClick={handleDownload}
                         title="Download Image"
@@ -391,7 +419,6 @@ function App() {
           overflow-hidden
         `}>
           <div className="flex-1 overflow-hidden relative">
-            {/* Added larger bottom padding (pb-24) on mobile to clear the sticky button */}
             <div className="h-full overflow-y-auto custom-scrollbar p-5 md:p-8 pb-28 md:pb-8">
                <ConfigPanel 
                  config={config} 
@@ -439,7 +466,6 @@ function App() {
 
       </main>
 
-      {/* Favorites Drawer */}
       <HistoryDrawer 
         isOpen={isHistoryOpen} 
         onClose={() => setIsHistoryOpen(false)} 
@@ -448,7 +474,6 @@ function App() {
         onDelete={handleDeleteHistoryItem}
       />
       
-      {/* Settings Modal */}
       {isSettingsOpen && (
         <div className="fixed inset-0 bg-stone-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-scale-in">
