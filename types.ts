@@ -1,20 +1,34 @@
 
 export enum MetalType {
-  YellowGold = '18K 黄金',
-  WhiteGold = '18K 白金',
-  RoseGold = '18K 玫瑰金',
-  Platinum = '铂金',
-  Silver = '925 纯银'
+  YellowGold18K = '18K 黄金',
+  WhiteGold18K = '18K 白金',
+  RoseGold18K = '18K 玫瑰金',
+  YellowGold24K = '24K 足金',
+  Gold14K = '14K 黄金',
+  Gold9K = '9K 黄金',
+  Platinum = '铂金 PT950',
+  Palladium = '钯金',
+  Silver = '925 纯银',
+  Titanium = '钛金属'
 }
 
 export enum GemstoneType {
   Diamond = '钻石',
+  Moissanite = '莫桑钻',
   Ruby = '红宝石',
   Sapphire = '蓝宝石',
   Emerald = '祖母绿',
+  Amethyst = '紫水晶',
+  Aquamarine = '海蓝宝石',
+  Morganite = '摩根石',
+  Tanzanite = '坦桑石',
   Pearl = '珍珠',
   Opal = '欧泊',
   Jade = '翡翠',
+  Citrine = '黄水晶',
+  Peridot = '橄榄石',
+  Garnet = '石榴石',
+  Tourmaline = '碧玺',
   None = '无主石'
 }
 

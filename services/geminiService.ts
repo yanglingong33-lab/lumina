@@ -81,25 +81,29 @@ export const generateJewelryDesign = async (
   const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
   const cleanBase64 = base64Image.replace(/^data:image\/[a-zA-Z+]+;base64,/, '');
 
-  // Revised Prompt
+  // Revised Prompt for Maximum Realism
   const prompt = `
-    Role: World-class High Jewelry Designer (Haute Joaillerie).
-    Task: Create a design concept and then generate a luxury jewelry design image based on the input.
+    Role: Senior Haute Joaillerie Designer & Luxury Product Photographer.
+    Task: Re-imagine the item in the image as a museum-grade luxury jewelry piece.
     
-    STEP 1: CONCEPT (Text in Chinese)
-    Write a "Design Concept" (设计理念) in Chinese.
-    - Describe the inspiration, materials (${config.metal}, ${config.gemstone}), and the transformation.
-    - Tone: Poetic, sophisticated, luxury.
-    - Length: Around 100 words.
+    STEP 1: DESIGN CONCEPT (Output in Chinese)
+    Write a "设计理念" (Design Concept).
+    - Focus on craftsmanship: Explain the use of ${config.metal} and how ${config.gemstone} is set (e.g., pavé, tension, or claw setting).
+    - Aesthetic narrative: Describe how the silhouette of the original object inspired this piece.
+    - Tone: Professional, sophisticated, high-end atelier style.
+    - Length: ~120 words.
     
-    STEP 2: VISUALIZATION (Image)
-    Generate the jewelry design image based on the concept.
-    - Type: ${config.type}
-    - Perspective: ${config.viewAngle}
-    - Style: ${config.description || 'Elegant and modern'}
-    - Photorealistic, 8k, macro photography.
+    STEP 2: PHOTOREALISTIC VISUALIZATION
+    Render the design with the following strictly enforced photographic standards to eliminate AI-artifacts:
+    - Subject: A single ${config.type} made of polished ${config.metal}, featuring high-grade ${config.gemstone} and ${config.auxiliaryStone || 'refined detailing'}.
+    - Perspective: ${config.viewAngle}.
+    - Lighting: Professional studio softbox lighting with reflector bounces. Capture realistic "caustics" through gemstones and "specular highlights" on high-polished metal.
+    - Optics: Shot on Phase One XF with a 100mm Macro Lens. Shallow depth of field with creamy bokeh. Pin-sharp focus on the primary setting.
+    - Material Physics: Accurate light refraction (IOR) for ${config.gemstone}. Ensure metal surfaces show ray-traced reflections of a clean studio environment. No flat textures.
+    - Style: ${config.description || 'Modern Elegance'}.
+    - Background: Clean, neutral luxury grey or soft champagne gradient with a subtle, realistic surface reflection.
     
-    IMPORTANT: You MUST return BOTH the text description and the generated image.
+    Constraint: NO text, NO watermarks, NO floating elements. The piece must feel physically heavy and correctly seated on its surface.
   `;
 
   // --- EXECUTION WITH FALLBACK ---

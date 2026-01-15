@@ -84,10 +84,10 @@ const CustomSelect: React.FC<CustomSelectProps> = ({ label, value, onChange, opt
         <div 
           className={`
             absolute z-[60] w-full mt-2 bg-white border border-stone-100 rounded-xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.15)] overflow-hidden
-            origin-top transition-all duration-300 cubic-bezier(0.16, 1, 0.3, 1)
+            origin-top transition-all duration-500 ease-spring
             ${isOpen 
               ? 'opacity-100 translate-y-0 scale-100 pointer-events-auto' 
-              : 'opacity-0 -translate-y-2 scale-95 pointer-events-none'
+              : 'opacity-0 -translate-y-4 scale-90 pointer-events-none'
             }
           `}
         >
