@@ -1,6 +1,6 @@
 
 import { GoogleGenAI } from "@google/genai";
-import { DesignConfig, GenerationResult, AppSettings } from "../types";
+import { DesignConfig, GenerationResult, AppSettings, VariationMode } from "../types";
 
 // User provided default
 const DEFAULT_BASE_URL = "https://api.apimart.ai";
@@ -15,66 +15,45 @@ const FALLBACK_MODELS = [
 ];
 
 /**
+ * Helper to get settings
+ */
+const getSettings = () => {
+  const systemKey = process.env.API_KEY; 
+  let apiKey = systemKey;
+  let baseUrl: string = DEFAULT_BASE_URL;
+  let modelName = DEFAULT_MODEL;
+
+  try {
+    const savedSettings = localStorage.getItem('lumina_settings');
+    if (savedSettings) {
+      const parsed: AppSettings = JSON.parse(savedSettings);
+      if (parsed.apiKey && parsed.apiKey.trim()) apiKey = parsed.apiKey.trim();
+      if (parsed.baseUrl && parsed.baseUrl.trim()) baseUrl = parsed.baseUrl.trim();
+      if (parsed.modelName && parsed.modelName.trim()) modelName = parsed.modelName.trim();
+    }
+  } catch (e) { console.warn("Settings error", e); }
+
+  // Clean Base URL
+  if (baseUrl) {
+    let rawUrl = baseUrl.replace(/\/+$/, '');
+    if (rawUrl.endsWith('/v1')) rawUrl = rawUrl.substring(0, rawUrl.length - 3);
+    else if (rawUrl.endsWith('/v1beta/models')) rawUrl = rawUrl.split('/v1beta/models')[0];
+    else if (rawUrl.endsWith('/v1beta')) rawUrl = rawUrl.substring(0, rawUrl.length - 7);
+    baseUrl = rawUrl;
+  }
+
+  return { apiKey, baseUrl, modelName, systemKey };
+};
+
+/**
  * Generates a jewelry design based on an input image and configuration.
  */
 export const generateJewelryDesign = async (
   base64Image: string,
   config: DesignConfig
 ): Promise<GenerationResult> => {
-  // 1. Determine effective settings
-  const systemKey = process.env.API_KEY; 
-  
-  let apiKey = systemKey;
-  let baseUrl: string = DEFAULT_BASE_URL;
-  let modelName = DEFAULT_MODEL;
-  let usingCustomKey = false;
-
-  // Try to load from local storage
-  try {
-    const savedSettings = localStorage.getItem('lumina_settings');
-    if (savedSettings) {
-      const parsed: AppSettings = JSON.parse(savedSettings);
-      
-      if (parsed.apiKey && parsed.apiKey.trim()) {
-        apiKey = parsed.apiKey.trim();
-        usingCustomKey = apiKey !== systemKey;
-      }
-      
-      if (parsed.baseUrl && parsed.baseUrl.trim()) {
-        baseUrl = parsed.baseUrl.trim();
-      }
-      
-      if (parsed.modelName && parsed.modelName.trim()) {
-        modelName = parsed.modelName.trim();
-      }
-    }
-  } catch (e) {
-    console.warn("Failed to read settings", e);
-  }
-
-  // --- CLEAN BASE URL LOGIC ---
-  if (baseUrl) {
-    let rawUrl = baseUrl;
-    rawUrl = rawUrl.replace(/\/+$/, '');
-    
-    // Intelligent cleaning
-    if (rawUrl.endsWith('/v1')) rawUrl = rawUrl.substring(0, rawUrl.length - 3);
-    else if (rawUrl.endsWith('/v1beta/models')) rawUrl = rawUrl.split('/v1beta/models')[0];
-    else if (rawUrl.endsWith('/v1beta')) rawUrl = rawUrl.substring(0, rawUrl.length - 7);
-    else if (rawUrl.includes('/images/generations')) rawUrl = rawUrl.split('/v1/images')[0];
-    else if (rawUrl.includes('/chat/completions')) rawUrl = rawUrl.split('/v1/chat')[0];
-    
-    baseUrl = rawUrl;
-  }
-
-  if (!apiKey) {
-    throw new Error("AUTH_ERROR: 未配置 API Key。请在设置中输入您的密钥。");
-  }
-
-  const isSkKey = apiKey.startsWith('sk-');
-  if (isSkKey && !baseUrl) {
-    throw new Error("检测到以 'sk-' 开头的第三方密钥。请配置 Base URL。");
-  }
+  const settings = getSettings();
+  if (!settings.apiKey) throw new Error("AUTH_ERROR: 未配置 API Key。");
 
   // Prepare Data
   const mimeMatch = base64Image.match(/^data:(image\/[a-zA-Z+]+);base64,/);
@@ -88,45 +67,121 @@ export const generateJewelryDesign = async (
     
     STEP 1: DESIGN CONCEPT (Output in Chinese)
     Write a "设计理念" (Design Concept).
-    - Focus on craftsmanship: Explain the use of ${config.metal} and how ${config.gemstone} is set (e.g., pavé, tension, or claw setting).
+    - Focus on craftsmanship: Explain the use of ${config.metal} and how ${config.gemstone} is set.
     - Aesthetic narrative: Describe how the silhouette of the original object inspired this piece.
-    - Tone: Professional, sophisticated, high-end atelier style.
     - Length: ~120 words.
     
     STEP 2: PHOTOREALISTIC VISUALIZATION
-    Render the design with the following strictly enforced photographic standards to eliminate AI-artifacts:
+    Render the design with the following strictly enforced photographic standards:
     - Subject: A single ${config.type} made of polished ${config.metal}, featuring high-grade ${config.gemstone} and ${config.auxiliaryStone || 'refined detailing'}.
     - Perspective: ${config.viewAngle}.
-    - Lighting: Professional studio softbox lighting with reflector bounces. Capture realistic "caustics" through gemstones and "specular highlights" on high-polished metal.
-    - Optics: Shot on Phase One XF with a 100mm Macro Lens. Shallow depth of field with creamy bokeh. Pin-sharp focus on the primary setting.
-    - Material Physics: Accurate light refraction (IOR) for ${config.gemstone}. Ensure metal surfaces show ray-traced reflections of a clean studio environment. No flat textures.
+    - Lighting: Professional studio softbox lighting.
     - Style: ${config.description || 'Modern Elegance'}.
-    - Background: Clean, neutral luxury grey or soft champagne gradient with a subtle, realistic surface reflection.
+    - Background: Clean, neutral luxury grey or soft champagne gradient.
     
-    Constraint: NO text, NO watermarks, NO floating elements. The piece must feel physically heavy and correctly seated on its surface.
+    Constraint: NO text, NO watermarks. The piece must feel physically heavy and correctly seated.
   `;
 
-  // --- EXECUTION WITH FALLBACK ---
+  return executeGeneration(settings.apiKey, settings.baseUrl, prompt, cleanBase64, mimeType, config, settings.modelName);
+};
 
+/**
+ * Generates a variation (Edit, Model, Views) based on the GENERATED image.
+ */
+export const generateJewelryVariation = async (
+  generatedImageBase64: string,
+  mode: VariationMode,
+  refinePrompt?: string
+): Promise<GenerationResult> => {
+  const settings = getSettings();
+  if (!settings.apiKey) throw new Error("AUTH_ERROR: 未配置 API Key。");
+
+  const mimeMatch = generatedImageBase64.match(/^data:(image\/[a-zA-Z+]+);base64,/);
+  const mimeType = mimeMatch ? mimeMatch[1] : 'image/png';
+  const cleanBase64 = generatedImageBase64.replace(/^data:image\/[a-zA-Z+]+;base64,/, '');
+
+  let prompt = "";
+  let aspectRatio = "1:1";
+
+  switch (mode) {
+    case VariationMode.REFINE:
+      prompt = `
+        Role: Senior Jewelry Designer.
+        Task: Edit the jewelry in the input image based on the user's instruction.
+        User Instruction: "${refinePrompt}"
+        Requirements:
+        - Keep the core composition and lighting of the input image similar unless asked to change.
+        - Maintain photorealistic quality (8k, octane render).
+        - Output a short Chinese description of what was changed.
+      `;
+      break;
+    case VariationMode.VIEWS:
+      prompt = `
+        Role: Technical Jewelry Illustrator & Photographer.
+        Task: Create a technical multi-view composition of the jewelry shown in the input image.
+        Requirements:
+        - Show 3 distinct views: Front View, Side View, and Top View.
+        - Arrange them elegantly on a clean white or light grey background.
+        - Maintain the exact materials (Metal, Gems) from the input image.
+        - High resolution, sharp details for manufacturing reference.
+        - Output description: "三视图生成完毕"
+      `;
+      aspectRatio = "16:9";
+      break;
+    case VariationMode.MODEL:
+      prompt = `
+        Role: Fashion Photographer.
+        Task: Show the jewelry from the input image being worn by a high-fashion model.
+        Requirements:
+        - The model should be elegant, skin texture realistic.
+        - Placement: Correct anatomical placement (e.g., ring on finger, necklace on neck).
+        - Focus: Shallow depth of field, focus on the jewelry.
+        - Lighting: Cinematic fashion lighting.
+        - Output description: "模特佩戴效果展示"
+      `;
+      aspectRatio = "3:4";
+      break;
+    case VariationMode.PHOTO:
+      prompt = `
+        Role: Commercial Product Photographer.
+        Task: Create an award-winning advertising shot of the jewelry in the input image.
+        Requirements:
+        - Props: Place it on a textured surface (marble, silk, or slate) or a floating pedestal.
+        - Lighting: Dramatic, high-contrast 'Rembrandt' lighting or ethereal 'Rim' lighting.
+        - Atmosphere: Luxury, expensive, sophisticated.
+        - Output description: "商业摄影大片展示"
+      `;
+      aspectRatio = "4:3";
+      break;
+  }
+
+  // Mock config for variation
+  const variationConfig: any = {
+    imageSize: '2K',
+    aspectRatio: aspectRatio
+  };
+
+  return executeGeneration(settings.apiKey, settings.baseUrl, prompt, cleanBase64, mimeType, variationConfig, settings.modelName);
+};
+
+// Shared execution logic
+const executeGeneration = async (apiKey: string, baseUrl: string, prompt: string, base64: string, mimeType: string, config: any, modelName: string) => {
   const execute = async (currentKey: string, currentModel: string) => {
     if (baseUrl || currentKey.startsWith('sk-')) {
-      return await generateViaProxy(baseUrl, currentKey, prompt, cleanBase64, mimeType, config, currentModel);
+      return await generateViaProxy(baseUrl, currentKey, prompt, base64, mimeType, config, currentModel);
     } else {
-      return await generateViaSDK(currentKey, prompt, cleanBase64, mimeType, config, currentModel);
+      return await generateViaSDK(currentKey, prompt, base64, mimeType, config, currentModel);
     }
   };
 
   try {
     return await execute(apiKey, modelName);
   } catch (error: any) {
-    // 1. Auth Error Fallback (Custom Key -> System Key)
-    if ((error.message?.includes('AUTH_ERROR') || error.status === 401) && usingCustomKey && systemKey) {
-       console.warn("Custom key failed with 401. Retrying with system default key...");
+    if ((error.message?.includes('AUTH_ERROR') || error.status === 401) && process.env.API_KEY) {
+       console.warn("Retrying with system default key...");
        try {
-         return await execute(systemKey, modelName);
-       } catch (retryError) {
-         throw retryError; 
-       }
+         return await execute(process.env.API_KEY, modelName);
+       } catch (retryError) { throw retryError; }
     }
     throw error;
   }
@@ -140,7 +195,7 @@ async function generateViaSDK(
   prompt: string, 
   base64Image: string, 
   mimeType: string,
-  config: DesignConfig,
+  config: any,
   modelName: string
 ): Promise<GenerationResult> {
   const ai = new GoogleGenAI({ apiKey });
@@ -149,7 +204,7 @@ async function generateViaSDK(
     const imgConfig: any = {};
     if (modelName.includes('gemini-3')) {
        imgConfig.aspectRatio = config.aspectRatio || '1:1';
-       if (level === 'full') imgConfig.imageSize = config.imageSize;
+       if (level === 'full' && config.imageSize) imgConfig.imageSize = config.imageSize;
     }
     return imgConfig;
   };
@@ -190,7 +245,7 @@ async function generateViaProxy(
   prompt: string,
   base64Image: string,
   mimeType: string,
-  config: DesignConfig,
+  config: any,
   modelName: string
 ): Promise<GenerationResult> {
   
@@ -198,7 +253,7 @@ async function generateViaProxy(
     const imgConfig: any = {};
     if (model.includes('gemini-3')) {
       imgConfig.aspectRatio = config.aspectRatio || '1:1';
-      if (level === 'full') imgConfig.imageSize = config.imageSize;
+      if (level === 'full' && config.imageSize) imgConfig.imageSize = config.imageSize;
     }
     return {
       contents: [{
@@ -231,148 +286,76 @@ async function generateViaProxy(
       const errText = await response.text();
       let errJson;
       try { errJson = JSON.parse(errText); } catch(e) {}
-      
-      const errorMessage = 
-        errJson?.error?.message || 
-        errJson?.message || 
-        errJson?.msg || 
-        (typeof errJson === 'string' ? errJson : errText) || 
-        `HTTP ${response.status}`;
-
-      throw { 
-        status: response.status, 
-        message: errorMessage 
-      };
+      const errorMessage = errJson?.error?.message || errJson?.message || `HTTP ${response.status} Error`;
+      // Throw standard Error object
+      throw new Error(errorMessage);
     }
-
     const data = await response.json();
     return parseResponse(data);
   };
 
-  // 1. Try Primary Model
   try {
     return await performFetch(modelName, 'full');
   } catch (error: any) {
-    
-    // Check for Model Not Found / No Channel / 503 / 404
-    const isModelMissing = 
-        error.status === 404 || 
-        error.status === 503 ||
-        (error.message && (
-            error.message.includes('not found') || 
-            error.message.includes('无可用渠道') ||
-            error.message.includes('distributor') ||
-            error.message.includes('upstream')
-        ));
+    const isModelMissing = error.message && (error.message.includes('not found') || error.message.includes('404') || error.message.includes('503'));
 
     if (isModelMissing) {
-       console.warn(`Primary model ${modelName} failed. Attempting fallbacks...`);
-       
+       console.warn(`Model ${modelName} failed. Attempting fallbacks...`);
        const fallbackCandidates = FALLBACK_MODELS.filter(m => m !== modelName);
-
        for (const fallbackModel of fallbackCandidates) {
          try {
-           console.log(`Trying fallback: ${fallbackModel}`);
            return await performFetch(fallbackModel, 'no-size');
-         } catch (fbError: any) {
-           console.warn(`Fallback ${fallbackModel} failed:`, fbError.message);
-           if (fbError.status === 401) throw fbError; 
-         }
+         } catch (fbError: any) { if (fbError.message && fbError.message.includes('401')) throw fbError; }
        }
-       
-       throw new Error(`无法找到可用的画图模型。尝试了: ${modelName}, ${fallbackCandidates.join(', ')}。请联系服务商或检查 API 配置。`);
+       throw new Error(`无法找到可用的画图模型。`);
     }
 
-    // Standard Retry for 400 errors
-    if (isRetryable400(error)) {
-        return await performFetch(modelName, 'no-size');
-    }
-    
+    if (isRetryable400(error)) return await performFetch(modelName, 'no-size');
     handleError(error);
     throw error;
   }
 }
 
 function isRetryable400(error: any) {
-  return error.status === 400 || (error.message && (error.message.includes('INVALID_ARGUMENT') || error.message.includes('400')));
+  // Check for status on error object if it exists (for custom error objects) or parse message
+  const msg = error.message || '';
+  return msg.includes('INVALID_ARGUMENT') || msg.includes('400');
 }
 
 function parseResponse(response: any): GenerationResult {
   let image = '';
   let description = '';
-
   const candidates = response.candidates || response.response?.candidates;
   
   if (candidates && candidates[0]?.content?.parts) {
     for (const part of candidates[0].content.parts) {
-      if (part.inlineData && part.inlineData.data) {
-        image = `data:image/png;base64,${part.inlineData.data}`;
-      } else if (part.text) {
-        description += part.text;
-      }
+      if (part.inlineData && part.inlineData.data) image = `data:image/png;base64,${part.inlineData.data}`;
+      else if (part.text) description += part.text;
     }
   }
 
-  // Fallback markdown parsing if needed
+  // Fallback markdown parsing
   if (!image && description) {
-    const markdownImageRegex = /!\[.*?\]\((.*?)\)/;
-    const match = description.match(markdownImageRegex);
+    const match = description.match(/!\[.*?\]\((.*?)\)/);
     if (match && match[1]) {
       image = match[1];
-      // Keep description, just remove the image tag
-      const descWithoutImg = description.replace(match[0], '').trim();
-      if (descWithoutImg) description = descWithoutImg;
+      description = description.replace(match[0], '').trim();
     }
   }
 
-  if (!image) {
-    if (description) {
-      throw new Error("模型仅返回了文本，未生成图片。可能是所选模型不支持同时生成。");
-    }
-    throw new Error("生成失败，API 返回数据为空。");
-  }
+  if (!image) throw new Error("API 返回数据为空，未生成图片。");
 
-  // Soft clean description
-  description = description.trim();
-  // Remove Markdown headings if they exist at the very start
-  description = description.replace(/^#+\s*设计理念.*?\n/, '');
-  description = description.replace(/^\*\*设计理念.*?\*\*/, '');
-  
   return {
     image,
-    description: description || "（设计师未提供详细理念，但已为您完成设计）"
+    description: description.replace(/^#+\s*设计理念.*?\n/, '').replace(/^\*\*设计理念.*?\*\*/, '').trim() || "生成成功"
   };
 }
 
 function handleError(error: any) {
-  if (typeof error === 'object' && error !== null) {
-      console.error("Gemini Generation Error Details:", JSON.stringify(error, null, 2));
-  } else {
-      console.error("Gemini Generation Error:", error);
-  }
-    
+  console.error("Gemini Error:", error);
   let errorMessage = "生成设计时出现问题。";
-  const msgLower = (error.message || '').toLowerCase();
-  
-  if (error instanceof TypeError && error.message.includes("Failed to fetch")) {
-    errorMessage = "网络请求失败。请检查 Base URL 是否正确。";
-  } 
-  else if (
-    error.status === 401 || 
-    error.status === 403 || 
-    msgLower.includes("api key not valid") || 
-    msgLower.includes("invalid token") ||
-    msgLower.includes("unauthenticated") ||
-    msgLower.includes("无效的令牌")
-  ) {
-     errorMessage = "AUTH_ERROR: API Key 无效或过期 (401)。请检查您的密钥额度。";
-  } 
-  else if (error.status === 404 || msgLower.includes("not found")) {
-    errorMessage = `找不到模型 (404)。请在设置中尝试更换其他模型名称。`;
-  } 
-  else if (error.message) {
-    errorMessage = `错误: ${error.message}`;
-  }
-
+  if (error.message && error.message.includes("Failed to fetch")) errorMessage = "网络请求失败，请检查 Base URL。";
+  else if (error.message && (error.message.includes("401") || error.message.includes("403"))) errorMessage = "AUTH_ERROR: API Key 无效或过期。";
+  else if (error.message) errorMessage = `错误: ${error.message}`;
   throw new Error(errorMessage);
 }

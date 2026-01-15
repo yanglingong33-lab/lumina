@@ -96,3 +96,18 @@ export interface AppSettings {
 }
 
 export type AppState = 'IDLE' | 'CONFIGURING' | 'GENERATING' | 'RESULT';
+
+// New types for variations
+export enum VariationMode {
+  REFINE = 'REFINE', // Text edit
+  VIEWS = 'VIEWS',   // 3-views
+  MODEL = 'MODEL',   // On Model
+  PHOTO = 'PHOTO'    // Photography
+}
+
+export interface VariationItem {
+  id: string;
+  mode: VariationMode;
+  image: string;
+  description: string;
+}
