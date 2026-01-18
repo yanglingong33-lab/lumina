@@ -6,7 +6,7 @@ import ComparisonSlider from './components/ComparisonSlider';
 import ConfigPanel from './components/ConfigPanel';
 import ImageUploader from './components/ImageUploader';
 import HistoryDrawer from './components/HistoryDrawer';
-import { Gem, Download, Trash2, Loader2, Sparkles, Heart, Settings, X, Save, Wand2, Layers, User, Camera, Send, Edit, History, ArrowLeft, Feather, ChevronDown, ChevronUp, PauseCircle, AlertTriangle } from 'lucide-react';
+import { Gem, Download, Trash2, Loader2, Sparkles, Heart, Settings, X, Save, Wand2, Layers, User, Camera, Send, Edit, History, ArrowLeft, Feather, ChevronDown, ChevronUp, PauseCircle, AlertTriangle, Maximize2, Eye } from 'lucide-react';
 
 const LOADING_STEPS = ["Analyzing Geometry...", "Refining Details...", "Simulating Light...", "Mastering Texture..."];
 
@@ -22,6 +22,10 @@ function App() {
   // Task Control
   const abortControllerRef = useRef<AbortController | null>(null);
   const [showStopWarning, setShowStopWarning] = useState(false);
+
+  // Zoom/Lightbox Control
+  const [isImageZoomed, setIsImageZoomed] = useState(false);
+  const [showOriginalInZoom, setShowOriginalInZoom] = useState(false); // Press to compare logic
 
   // Settings
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -375,7 +379,11 @@ function App() {
                  {/* Main Image Area */}
                  <div className="relative flex-1 w-full min-h-0 shadow-soft rounded-xl md:rounded-2xl overflow-hidden bg-white border border-stone-100 group">
                     {generatedImage ? (
-                        <ComparisonSlider originalImage={originalImage} generatedImage={generatedImage} />
+                        <ComparisonSlider 
+                          originalImage={originalImage} 
+                          generatedImage={generatedImage} 
+                          onImageClick={() => setIsImageZoomed(true)}
+                        />
                     ) : (
                       <>
                         <img src={originalImage} alt="Reference" className="w-full h-full object-contain p-4 md:p-6" />
@@ -404,8 +412,9 @@ function App() {
 
                     {generatedImage && !isGenerating && (
                       <div className="absolute top-3 right-3 flex flex-col gap-2 z-20">
-                         <button onClick={() => setOriginalImage(null)} className="p-2 bg-white/90 backdrop-blur rounded-full text-stone-400 hover:text-red-500 shadow-sm"><Trash2 className="w-4 h-4" /></button>
-                         <button onClick={() => handleDownload()} className="p-2 bg-stone-900 text-white rounded-full hover:bg-stone-700 shadow-sm"><Download className="w-4 h-4" /></button>
+                         <button onClick={() => setOriginalImage(null)} className="p-2 bg-white/90 backdrop-blur rounded-full text-stone-400 hover:text-red-500 shadow-sm" title="Delete"><Trash2 className="w-4 h-4" /></button>
+                         <button onClick={() => handleDownload()} className="p-2 bg-stone-900 text-white rounded-full hover:bg-stone-700 shadow-sm" title="Download"><Download className="w-4 h-4" /></button>
+                         <button onClick={() => setIsImageZoomed(true)} className="p-2 bg-white/90 backdrop-blur rounded-full text-stone-600 hover:text-champagne-500 shadow-sm" title="Full Screen"><Maximize2 className="w-4 h-4" /></button>
                       </div>
                     )}
                  </div>
@@ -609,6 +618,7 @@ function App() {
 
       </main>
 
+      {/* History Drawer */}
       <HistoryDrawer 
         isOpen={isHistoryOpen} 
         onClose={() => setIsHistoryOpen(false)} 
@@ -671,6 +681,48 @@ function App() {
                  </div>
               </div>
            </div>
+        </div>
+      )}
+
+      {/* Full Screen Image Modal (LightBox) */}
+      {isImageZoomed && generatedImage && (
+        <div className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-xl animate-fade-in flex flex-col">
+          {/* Lightbox Header */}
+          <div className="flex-none p-4 md:p-6 flex justify-between items-center text-white/80">
+             <div className="flex items-center gap-3">
+               <span className="text-xs font-bold tracking-[0.2em] uppercase text-champagne-400">Preview Mode</span>
+             </div>
+             <button 
+                onClick={() => setIsImageZoomed(false)}
+                className="p-2 rounded-full hover:bg-white/10 transition-colors"
+             >
+                <X className="w-6 h-6" />
+             </button>
+          </div>
+
+          {/* Lightbox Content */}
+          <div className="flex-1 flex items-center justify-center p-4 md:p-8 overflow-hidden relative select-none">
+             <img 
+               src={showOriginalInZoom && originalImage ? originalImage : generatedImage} 
+               className="max-w-full max-h-full object-contain shadow-2xl transition-opacity duration-200"
+               style={{ opacity: 1 }}
+             />
+             
+             {/* "Hold to Compare" Hint */}
+             {originalImage && (
+               <button
+                  onMouseDown={() => setShowOriginalInZoom(true)}
+                  onMouseUp={() => setShowOriginalInZoom(false)}
+                  onMouseLeave={() => setShowOriginalInZoom(false)}
+                  onTouchStart={() => setShowOriginalInZoom(true)}
+                  onTouchEnd={() => setShowOriginalInZoom(false)}
+                  className="absolute bottom-8 left-1/2 -translate-x-1/2 bg-white/10 backdrop-blur-md border border-white/20 text-white px-6 py-2.5 rounded-full text-xs font-bold tracking-widest hover:bg-white/20 transition-all flex items-center gap-2 select-none active:scale-95"
+               >
+                 <Eye className="w-4 h-4" />
+                 {showOriginalInZoom ? '松开恢复' : '按住对比原图'}
+               </button>
+             )}
+          </div>
         </div>
       )}
       

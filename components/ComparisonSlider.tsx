@@ -5,16 +5,19 @@ import { ChevronsLeftRight } from 'lucide-react';
 interface ComparisonSliderProps {
   originalImage: string;
   generatedImage: string;
+  onImageClick?: () => void;
 }
 
-const ComparisonSlider: React.FC<ComparisonSliderProps> = ({ originalImage, generatedImage }) => {
+const ComparisonSlider: React.FC<ComparisonSliderProps> = ({ originalImage, generatedImage, onImageClick }) => {
   const [sliderPosition, setSliderPosition] = useState(50);
   const [isResizing, setIsResizing] = useState(false);
   const [containerWidth, setContainerWidth] = useState<number>(0);
   const containerRef = useRef<HTMLDivElement>(null);
+  
+  // Track drag start to distinguish click from drag
+  const dragStartPos = useRef<{x: number, y: number} | null>(null);
 
   // Use ResizeObserver to track container width changes accurately
-  // This solves the issue on Desktop/Tablet where flex layout transitions cause size mismatches
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -36,15 +39,30 @@ const ComparisonSlider: React.FC<ComparisonSliderProps> = ({ originalImage, gene
     return () => resizeObserver.disconnect();
   }, []);
 
-  const handlePointerDown = useCallback(() => {
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
     setIsResizing(true);
+    dragStartPos.current = { x: e.clientX, y: e.clientY };
+    e.currentTarget.setPointerCapture(e.pointerId);
   }, []);
 
-  const handlePointerUp = useCallback(() => {
+  const handlePointerUp = useCallback((e: React.PointerEvent) => {
     setIsResizing(false);
-  }, []);
+    e.currentTarget.releasePointerCapture(e.pointerId);
 
-  const handlePointerMove = useCallback((e: PointerEvent) => {
+    // Check if it was a click (minimal movement)
+    if (dragStartPos.current && onImageClick) {
+      const deltaX = Math.abs(e.clientX - dragStartPos.current.x);
+      const deltaY = Math.abs(e.clientY - dragStartPos.current.y);
+      
+      // Threshold for "Click" vs "Drag"
+      if (deltaX < 5 && deltaY < 5) {
+        onImageClick();
+      }
+    }
+    dragStartPos.current = null;
+  }, [onImageClick]);
+
+  const handlePointerMove = useCallback((e: React.PointerEvent) => {
     if (!isResizing || !containerRef.current) return;
     
     const rect = containerRef.current.getBoundingClientRect();
@@ -55,25 +73,14 @@ const ComparisonSlider: React.FC<ComparisonSliderProps> = ({ originalImage, gene
     setSliderPosition(percentage);
   }, [isResizing]);
 
-  useEffect(() => {
-    if (isResizing) {
-      window.addEventListener('pointermove', handlePointerMove);
-      window.addEventListener('pointerup', handlePointerUp);
-    } else {
-      window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('pointerup', handlePointerUp);
-    }
-    return () => {
-      window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('pointerup', handlePointerUp);
-    };
-  }, [isResizing, handlePointerMove, handlePointerUp]);
-
   return (
     <div 
-      className="relative w-full h-full overflow-hidden bg-white select-none group touch-none cursor-ew-resize"
+      className="relative w-full h-full overflow-hidden bg-white select-none group touch-none cursor-zoom-in"
       ref={containerRef}
       onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      title="点击放大查看"
     >
       {/* Generated Image (Background) - The Target */}
       <div className="absolute inset-0 z-0">
@@ -122,7 +129,7 @@ const ComparisonSlider: React.FC<ComparisonSliderProps> = ({ originalImage, gene
 
       {/* Slider Handle & Line */}
       <div 
-        className="absolute top-0 bottom-0 z-30 transition-all duration-100"
+        className="absolute top-0 bottom-0 z-30 transition-all duration-100 pointer-events-none"
         style={{ 
           left: `${sliderPosition}%`,
           transition: isResizing ? 'none' : 'left 0.1s ease-out'
