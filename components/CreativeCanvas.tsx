@@ -1,3 +1,4 @@
+
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { Pencil, Eraser, Move, Undo2, Trash2, Check, X, Palette, Circle, Star, Heart, Sparkles, SlidersHorizontal, ZoomIn, ZoomOut, Hand, Maximize, GripVertical } from 'lucide-react';
 
@@ -40,6 +41,7 @@ const CreativeCanvas: React.FC<CreativeCanvasProps> = ({ onConfirm, onCancel }) 
   const [brushSize, setBrushSize] = useState(2);
   const [opacity, setOpacity] = useState(1);
   const [brushTip, setBrushTip] = useState<BrushTip>('round');
+  const [brushColor, setBrushColor] = useState('#57534E');
 
   // Floating Panel State
   const [settingsOffset, setSettingsOffset] = useState({ x: 0, y: 0 });
@@ -91,14 +93,17 @@ const CreativeCanvas: React.FC<CreativeCanvasProps> = ({ onConfirm, onCancel }) 
       setBrushSize(2);
       setOpacity(0.8);
       setBrushTip('round');
+      setBrushColor('#57534E');
     } else if (tool === 'marker') {
       setBrushSize(6);
       setOpacity(0.9);
       setBrushTip('round');
+      setBrushColor('#292524');
     } else if (tool === 'gold') {
       setBrushSize(4);
       setOpacity(1);
       setBrushTip('round');
+      setBrushColor('#D4AF37');
     } else if (tool === 'eraser') {
       setBrushSize(20);
       setOpacity(1);
@@ -235,9 +240,7 @@ const CreativeCanvas: React.FC<CreativeCanvasProps> = ({ onConfirm, onCancel }) 
 
   const getToolColor = () => {
     if (tool === 'eraser') return '#FFFFFF';
-    if (tool === 'gold') return '#D4AF37';
-    if (tool === 'marker') return '#292524';
-    return '#57534E'; 
+    return brushColor; 
   };
 
   // --- Interaction Handlers ---
@@ -529,10 +532,22 @@ const CreativeCanvas: React.FC<CreativeCanvasProps> = ({ onConfirm, onCancel }) 
                    <div className="w-px h-4 bg-stone-200"></div>
 
                    {tool !== 'eraser' && (
-                     <div className="flex items-center gap-1 border-r border-stone-200 pr-3">
-                        {[ { id: 'round', icon: Circle }, { id: 'star', icon: Star }, { id: 'heart', icon: Heart }, { id: 'sparkle', icon: Sparkles } ].map(t => (
-                           <button key={t.id} onClick={() => setBrushTip(t.id as BrushTip)} className={`p-1.5 rounded-full transition-all ${brushTip === t.id ? 'bg-stone-900 text-white' : 'text-stone-400 hover:text-stone-600 hover:bg-stone-100'}`}><t.icon className="w-3.5 h-3.5" /></button>
-                        ))}
+                     <div className="flex items-center gap-3 border-r border-stone-200 pr-3 mr-3">
+                        <div className="flex items-center gap-1">
+                          {[ { id: 'round', icon: Circle }, { id: 'star', icon: Star }, { id: 'heart', icon: Heart }, { id: 'sparkle', icon: Sparkles } ].map(t => (
+                             <button key={t.id} onClick={() => setBrushTip(t.id as BrushTip)} className={`p-1.5 rounded-full transition-all ${brushTip === t.id ? 'bg-stone-900 text-white' : 'text-stone-400 hover:text-stone-600 hover:bg-stone-100'}`}><t.icon className="w-3.5 h-3.5" /></button>
+                          ))}
+                        </div>
+                        <div className="w-px h-4 bg-stone-200"></div>
+                        <div className="relative w-6 h-6 rounded-full overflow-hidden border border-stone-200 shadow-sm shrink-0 hover:scale-105 transition-transform" title="Color">
+                           <input 
+                              type="color" 
+                              value={brushColor} 
+                              onChange={(e) => setBrushColor(e.target.value)} 
+                              onPointerDown={(e) => e.stopPropagation()} 
+                              className="absolute -top-2 -left-2 w-10 h-10 p-0 border-0 cursor-pointer"
+                           />
+                        </div>
                      </div>
                    )}
                    <div className="flex items-center gap-2">

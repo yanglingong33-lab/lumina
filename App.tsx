@@ -84,8 +84,8 @@ function App() {
   const handleSaveSettings = () => { localStorage.setItem('lumina_settings', JSON.stringify(settings)); setIsSettingsOpen(false); setError(null); };
   
   const [config, setConfig] = useState<DesignConfig>({
-    metal: MetalType.YellowGold18K,
-    gemstone: GemstoneType.Diamond,
+    metal: MetalType.Any,
+    gemstone: GemstoneType.Any,
     auxiliaryStone: '',
     type: JewelryType.Ring,
     viewAngle: ViewAngle.Front,
@@ -376,13 +376,13 @@ function App() {
                      <div className="flex bg-white/80 backdrop-blur rounded-full p-1 border border-stone-200 shadow-sm">
                         <button 
                           onClick={() => setInputMode('upload')}
-                          className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all ${inputMode === 'upload' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-500 hover:text-stone-800'}`}
+                          className="flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all bg-stone-900 text-white shadow-md"
                         >
                            <ImageIcon className="w-3.5 h-3.5" /> 上传照片
                         </button>
                         <button 
                           onClick={() => setInputMode('canvas')}
-                          className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all ${inputMode === 'canvas' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-500 hover:text-stone-800'}`}
+                          className="flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all text-stone-500 hover:text-stone-800"
                         >
                            <PenTool className="w-3.5 h-3.5" /> 手绘草图
                         </button>
