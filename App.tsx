@@ -5,8 +5,9 @@ import { generateJewelryDesign, generateJewelryVariation, generateDesignConcept 
 import ComparisonSlider from './components/ComparisonSlider';
 import ConfigPanel from './components/ConfigPanel';
 import ImageUploader from './components/ImageUploader';
+import CreativeCanvas from './components/CreativeCanvas';
 import HistoryDrawer from './components/HistoryDrawer';
-import { Gem, Download, Trash2, Loader2, Sparkles, Heart, Settings, X, Save, Wand2, Layers, User, Camera, Send, Edit, History, ArrowLeft, Feather, ChevronDown, ChevronUp, PauseCircle, AlertTriangle, Maximize2, Eye } from 'lucide-react';
+import { Gem, Download, Trash2, Loader2, Sparkles, Heart, Settings, X, Save, Wand2, Layers, User, Camera, Send, Edit, History, ArrowLeft, Feather, ChevronDown, ChevronUp, PauseCircle, AlertTriangle, Maximize2, Eye, PenTool, Image as ImageIcon } from 'lucide-react';
 
 const LOADING_STEPS = ["Analyzing Geometry...", "Refining Details...", "Simulating Light...", "Mastering Texture..."];
 
@@ -19,6 +20,9 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [loadingStepIndex, setLoadingStepIndex] = useState(0);
   
+  // Input Mode: Upload vs Canvas
+  const [inputMode, setInputMode] = useState<'upload' | 'canvas'>('upload');
+
   // Task Control
   const abortControllerRef = useRef<AbortController | null>(null);
   const [showStopWarning, setShowStopWarning] = useState(false);
@@ -316,10 +320,6 @@ function App() {
     setAppState('RESULT');
     setIsHistoryOpen(false);
     setCurrentDesignId(item.id);
-    
-    // When loading from history, we should ideally populate the variations list with just this one item 
-    // to keep the UI consistent, or leave it empty if we don't track variations in history items separately.
-    // For now, let's treat it as a new "Original" item in the gallery.
     setVariations([{
       id: item.id,
       mode: VariationMode.ORIGINAL,
@@ -362,10 +362,7 @@ function App() {
       {/* Main Layout */}
       <main className="flex-1 flex flex-col md:flex-row min-h-0">
         
-        {/* Left Panel: Visual Workspace 
-            Mobile: h-[40vh] to leave 60% for controls. 
-            Desktop: flex-1
-        */}
+        {/* Left Panel: Visual Workspace */}
         <div className={`
           relative transition-all duration-700 w-full md:flex-1 bg-stone-50 
           ${originalImage ? 'h-[40vh] md:h-auto shrink-0 border-b md:border-b-0 md:border-r border-stone-100' : 'h-full'} 
@@ -373,7 +370,37 @@ function App() {
         `}>
           <div className="relative w-full h-full p-2 md:p-8 flex flex-col items-center justify-center overflow-hidden">
             {!originalImage ? (
-              <div className="w-full max-w-sm aspect-square animate-fade-in-up px-4"><ImageUploader onImageSelected={handleImageSelected} /></div>
+              <div className="w-full h-full flex flex-col">
+                {/* Input Mode Toggle */}
+                <div className="flex-none flex justify-center pb-4 z-20">
+                   <div className="flex bg-white/80 backdrop-blur rounded-full p-1 border border-stone-200 shadow-sm">
+                      <button 
+                        onClick={() => setInputMode('upload')}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all ${inputMode === 'upload' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-500 hover:text-stone-800'}`}
+                      >
+                         <ImageIcon className="w-3.5 h-3.5" /> 上传照片
+                      </button>
+                      <button 
+                        onClick={() => setInputMode('canvas')}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all ${inputMode === 'canvas' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-500 hover:text-stone-800'}`}
+                      >
+                         <PenTool className="w-3.5 h-3.5" /> 手绘草图
+                      </button>
+                   </div>
+                </div>
+
+                {/* Content Area */}
+                <div className="flex-1 min-h-0 w-full max-w-4xl mx-auto rounded-2xl overflow-hidden shadow-soft border border-stone-100 bg-white animate-fade-in-up">
+                   {inputMode === 'upload' ? (
+                      <ImageUploader onImageSelected={handleImageSelected} />
+                   ) : (
+                      <CreativeCanvas 
+                        onConfirm={handleImageSelected} 
+                        onCancel={() => setInputMode('upload')}
+                      />
+                   )}
+                </div>
+              </div>
             ) : (
               <div className="flex flex-col w-full h-full gap-3 md:gap-4">
                  {/* Main Image Area */}
@@ -395,42 +422,22 @@ function App() {
                     {isGenerating && (
                       <div className="absolute inset-0 bg-white/85 backdrop-blur-md z-50 flex flex-col items-center justify-center animate-fade-in transition-all duration-500">
                         <div className="relative mb-10 p-10 animate-float">
-                          {/* Ambient Glow */}
                           <div className="absolute inset-0 bg-champagne-400/20 blur-[60px] rounded-full animate-pulse-slow"></div>
-                          
-                          {/* Outer Elegant Ring */}
                           <div className="absolute inset-0 rounded-full border border-stone-100/50"></div>
                           <div className="absolute inset-0 rounded-full border border-t-champagne-300/50 border-r-transparent border-b-transparent border-l-transparent animate-spin-slow"></div>
-                          
-                          {/* Inner Counter-Rotating Ring */}
                           <div className="absolute inset-3 rounded-full border border-b-champagne-500/80 border-t-transparent border-r-transparent border-l-transparent animate-spin-reverse-slower"></div>
-
-                          {/* Central Pulsing Gem */}
                           <div className="relative z-10 flex items-center justify-center w-full h-full">
                             <Gem className="w-10 h-10 md:w-12 md:h-12 text-champagne-500 drop-shadow-[0_4px_10px_rgba(212,175,55,0.4)] animate-pulse-gold" strokeWidth={1} />
                           </div>
                         </div>
-                        
                         <div className="flex flex-col items-center gap-4 relative z-10 h-20">
-                          <span 
-                            key={loadingStepIndex} 
-                            className="font-serif text-lg md:text-xl text-stone-800 tracking-wide animate-fade-in-up"
-                          >
-                            {LOADING_STEPS[loadingStepIndex]}
-                          </span>
-                          
-                          {/* Indeterminate Progress Line */}
+                          <span key={loadingStepIndex} className="font-serif text-lg md:text-xl text-stone-800 tracking-wide animate-fade-in-up">{LOADING_STEPS[loadingStepIndex]}</span>
                           <div className="w-40 md:w-56 h-[2px] bg-stone-100 rounded-full overflow-hidden relative">
                             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-champagne-500 to-transparent w-1/2 animate-[shimmer_1.5s_infinite]"></div>
                           </div>
                         </div>
-                        
-                        <button 
-                          onClick={handleStopRequest}
-                          className="mt-6 flex items-center gap-2 px-6 py-2.5 rounded-full border border-stone-200 bg-white/80 hover:bg-stone-50 text-stone-400 hover:text-red-500 transition-all shadow-sm text-[10px] font-bold uppercase tracking-widest group opacity-0 animate-fade-in delay-700 fill-mode-forwards"
-                        >
-                          <PauseCircle className="w-4 h-4 group-hover:text-red-500 transition-colors" />
-                          Stop Generation
+                        <button onClick={handleStopRequest} className="mt-6 flex items-center gap-2 px-6 py-2.5 rounded-full border border-stone-200 bg-white/80 hover:bg-stone-50 text-stone-400 hover:text-red-500 transition-all shadow-sm text-[10px] font-bold uppercase tracking-widest group opacity-0 animate-fade-in delay-700 fill-mode-forwards">
+                          <PauseCircle className="w-4 h-4 group-hover:text-red-500 transition-colors" /> Stop Generation
                         </button>
                       </div>
                     )}
@@ -448,18 +455,9 @@ function App() {
                  {appState === 'RESULT' && !isGenerating && (
                    <div className="h-20 md:h-32 w-full flex-shrink-0 flex gap-2 md:gap-3 overflow-x-auto custom-scrollbar px-1 pb-1">
                       {variations.map((v) => (
-                        <div 
-                          key={v.id} 
-                          onClick={() => handleSelectVariation(v)} 
-                          className={`
-                            relative h-full aspect-square flex-shrink-0 rounded-lg overflow-hidden cursor-pointer group transition-all duration-300
-                            ${generatedImage === v.image ? 'border-2 border-champagne-500 ring-2 ring-champagne-200' : 'border border-stone-200 hover:border-champagne-300'}
-                          `}
-                        >
+                        <div key={v.id} onClick={() => handleSelectVariation(v)} className={`relative h-full aspect-square flex-shrink-0 rounded-lg overflow-hidden cursor-pointer group transition-all duration-300 ${generatedImage === v.image ? 'border-2 border-champagne-500 ring-2 ring-champagne-200' : 'border border-stone-200 hover:border-champagne-300'}`}>
                            <img src={v.image} className="w-full h-full object-cover" />
-                           <div className={`absolute bottom-0 inset-x-0 p-1 text-[8px] md:text-[9px] text-white text-center truncate ${generatedImage === v.image ? 'bg-champagne-600/90' : 'bg-black/60'}`}>
-                             {getVariationLabel(v)}
-                           </div>
+                           <div className={`absolute bottom-0 inset-x-0 p-1 text-[8px] md:text-[9px] text-white text-center truncate ${generatedImage === v.image ? 'bg-champagne-600/90' : 'bg-black/60'}`}>{getVariationLabel(v)}</div>
                         </div>
                       ))}
                       <div ref={variationsEndRef} />
@@ -470,69 +468,36 @@ function App() {
           </div>
         </div>
 
-        {/* Right Panel: Controls & Creative Studio 
-            Mobile: flex-1 (taking remaining 60vh)
-            Desktop: Fixed width
-        */}
+        {/* Right Panel: Controls & Creative Studio */}
         <div className={`
           z-20 bg-white md:w-[400px] md:border-l border-stone-100 flex flex-col 
           ${originalImage ? 'flex-1 flex' : 'hidden md:flex flex-1'} 
           overflow-hidden
         `}>
-          
           <div className="flex-1 overflow-y-auto custom-scrollbar relative">
             {appState === 'RESULT' ? (
-               /* Creative Studio Mode */
                <div className="p-5 md:p-6 space-y-6 md:space-y-8 animate-fade-in-up pb-24 md:pb-6">
+                  {/* ... (Existing Creative Studio Content) ... */}
                   <div className="space-y-1 md:space-y-2">
-                    <h2 className="text-xl md:text-2xl font-serif text-stone-900 flex items-center gap-2">
-                       <Wand2 className="w-5 h-5 text-champagne-500" /> 创意工坊
-                    </h2>
+                    <h2 className="text-xl md:text-2xl font-serif text-stone-900 flex items-center gap-2"><Wand2 className="w-5 h-5 text-champagne-500" /> 创意工坊</h2>
                     <p className="text-[10px] md:text-xs text-stone-500">CREATIVE STUDIO & REFINEMENT</p>
                   </div>
 
-                  {/* Design Concept Card - Collapsible */}
                   {generatedDescription && (
                     <div className="animate-fade-in-up delay-100">
-                      <button 
-                        onClick={() => setShowDescription(!showDescription)}
-                        className="w-full flex items-center justify-between mb-2 group"
-                      >
-                         <div className="flex items-center gap-2">
-                            <div className="h-px w-6 bg-champagne-400"></div>
-                            <span className="font-serif text-stone-900 text-sm tracking-wide italic">Design Concept</span>
-                         </div>
-                         <div className="text-stone-400 group-hover:text-champagne-500 transition-colors">
-                            {showDescription ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                         </div>
+                      <button onClick={() => setShowDescription(!showDescription)} className="w-full flex items-center justify-between mb-2 group">
+                         <div className="flex items-center gap-2"><div className="h-px w-6 bg-champagne-400"></div><span className="font-serif text-stone-900 text-sm tracking-wide italic">Design Concept</span></div>
+                         <div className="text-stone-400 group-hover:text-champagne-500 transition-colors">{showDescription ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}</div>
                       </button>
-
                       {showDescription && (
                         <div className="relative bg-[#FFFCF9] border border-stone-200 rounded-lg shadow-[0_15px_30px_-10px_rgba(0,0,0,0.08)] overflow-hidden transition-all duration-300">
-                          {/* Top decorative accent */}
                           <div className="h-1 w-full bg-gradient-to-r from-stone-200 via-champagne-400 to-stone-200 opacity-50"></div>
-                          
                           <div className="p-5 md:p-6 relative">
-                             {/* Background Watermark */}
-                             <div className="absolute right-[-20px] top-[-20px] opacity-[0.03] pointer-events-none transform rotate-12">
-                                <Feather className="w-32 h-32 text-stone-900" />
-                             </div>
-
-                             <div className="relative z-10">
-                                <p className="font-serif text-stone-600 text-sm md:text-[15px] leading-7 text-justify tracking-wide first-letter:text-2xl first-letter:font-serif first-letter:text-champagne-500 first-letter:float-left first-letter:mr-1.5 first-letter:mt-[-2px]">
-                                  {generatedDescription}
-                                </p>
-                             </div>
-
+                             <div className="absolute right-[-20px] top-[-20px] opacity-[0.03] pointer-events-none transform rotate-12"><Feather className="w-32 h-32 text-stone-900" /></div>
+                             <div className="relative z-10"><p className="font-serif text-stone-600 text-sm md:text-[15px] leading-7 text-justify tracking-wide first-letter:text-2xl first-letter:font-serif first-letter:text-champagne-500 first-letter:float-left first-letter:mr-1.5 first-letter:mt-[-2px]">{generatedDescription}</p></div>
                              <div className="mt-4 flex justify-between items-end border-t border-stone-100 pt-3">
-                                <div className="flex flex-col">
-                                   <span className="text-[9px] text-stone-400 uppercase tracking-widest font-sans">Date</span>
-                                   <span className="text-[10px] text-stone-600 font-serif">{new Date().toLocaleDateString()}</span>
-                                </div>
-                                <div className="flex flex-col items-end">
-                                   <span className="text-[9px] text-stone-400 uppercase tracking-widest font-sans">Designed by</span>
-                                   <span className="font-serif text-stone-800 text-xs italic">Lumina AI Atelier</span>
-                                </div>
+                                <div className="flex flex-col"><span className="text-[9px] text-stone-400 uppercase tracking-widest font-sans">Date</span><span className="text-[10px] text-stone-600 font-serif">{new Date().toLocaleDateString()}</span></div>
+                                <div className="flex flex-col items-end"><span className="text-[9px] text-stone-400 uppercase tracking-widest font-sans">Designed by</span><span className="font-serif text-stone-800 text-xs italic">Lumina AI Atelier</span></div>
                              </div>
                           </div>
                         </div>
@@ -544,90 +509,45 @@ function App() {
                      <label className="text-[10px] font-bold uppercase tracking-widest text-stone-400">智能修改 (Refine)</label>
                      <div className="flex gap-2">
                         <div className="relative flex-1">
-                           <input 
-                             type="text" 
-                             value={refineText}
-                             onChange={(e) => setRefineText(e.target.value)}
-                             onKeyDown={(e) => e.key === 'Enter' && !isGenerating && handleVariation(VariationMode.REFINE)}
-                             disabled={isGenerating}
-                             placeholder="例如：改为玫瑰金..."
-                             className="w-full bg-stone-50 border border-stone-200 rounded-xl pl-4 pr-10 py-3 text-sm focus:border-champagne-400 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-                           />
+                           <input type="text" value={refineText} onChange={(e) => setRefineText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && !isGenerating && handleVariation(VariationMode.REFINE)} disabled={isGenerating} placeholder="例如：改为玫瑰金..." className="w-full bg-stone-50 border border-stone-200 rounded-xl pl-4 pr-10 py-3 text-sm focus:border-champagne-400 outline-none disabled:opacity-50 disabled:cursor-not-allowed" />
                            <Edit className="absolute right-3 top-3 w-4 h-4 text-stone-400" />
                         </div>
-                        <button 
-                          onClick={() => handleVariation(VariationMode.REFINE)}
-                          disabled={!refineText.trim() || isGenerating}
-                          className="bg-stone-900 text-white p-3 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed hover:bg-stone-700 flex-shrink-0 transition-all"
-                        >
-                          <Send className="w-4 h-4" />
-                        </button>
+                        <button onClick={() => handleVariation(VariationMode.REFINE)} disabled={!refineText.trim() || isGenerating} className="bg-stone-900 text-white p-3 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed hover:bg-stone-700 flex-shrink-0 transition-all"><Send className="w-4 h-4" /></button>
                      </div>
                   </div>
 
                   <div className="space-y-3">
                      <label className="text-[10px] font-bold uppercase tracking-widest text-stone-400">一键生成 (Quick Gen)</label>
                      <div className="grid grid-cols-3 gap-2 md:gap-3">
-                        <button 
-                            onClick={() => handleVariation(VariationMode.VIEWS)} 
-                            disabled={isGenerating}
-                            className="flex flex-col items-center justify-center gap-2 p-3 md:p-4 rounded-xl border border-stone-100 bg-stone-50 hover:border-champagne-400 hover:bg-white transition-all group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-stone-50 disabled:hover:border-stone-100"
-                        >
-                           <Layers className="w-5 h-5 md:w-6 md:h-6 text-stone-400 group-hover:text-champagne-500 disabled:group-hover:text-stone-400" />
-                           <span className="text-[10px] font-bold text-stone-600">三视图</span>
-                        </button>
-                        <button 
-                            onClick={() => handleVariation(VariationMode.MODEL)} 
-                            disabled={isGenerating}
-                            className="flex flex-col items-center justify-center gap-2 p-3 md:p-4 rounded-xl border border-stone-100 bg-stone-50 hover:border-champagne-400 hover:bg-white transition-all group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-stone-50 disabled:hover:border-stone-100"
-                        >
-                           <User className="w-5 h-5 md:w-6 md:h-6 text-stone-400 group-hover:text-champagne-500 disabled:group-hover:text-stone-400" />
-                           <span className="text-[10px] font-bold text-stone-600">模特试戴</span>
-                        </button>
-                        <button 
-                            onClick={() => handleVariation(VariationMode.PHOTO)} 
-                            disabled={isGenerating}
-                            className="flex flex-col items-center justify-center gap-2 p-3 md:p-4 rounded-xl border border-stone-100 bg-stone-50 hover:border-champagne-400 hover:bg-white transition-all group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-stone-50 disabled:hover:border-stone-100"
-                        >
-                           <Camera className="w-5 h-5 md:w-6 md:h-6 text-stone-400 group-hover:text-champagne-500 disabled:group-hover:text-stone-400" />
-                           <span className="text-[10px] font-bold text-stone-600">摄影大片</span>
-                        </button>
+                        {[
+                          { mode: VariationMode.VIEWS, icon: Layers, label: '三视图' },
+                          { mode: VariationMode.MODEL, icon: User, label: '模特试戴' },
+                          { mode: VariationMode.PHOTO, icon: Camera, label: '摄影大片' }
+                        ].map((btn) => (
+                           <button key={btn.mode} onClick={() => handleVariation(btn.mode)} disabled={isGenerating} className="flex flex-col items-center justify-center gap-2 p-3 md:p-4 rounded-xl border border-stone-100 bg-stone-50 hover:border-champagne-400 hover:bg-white transition-all group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-stone-50 disabled:hover:border-stone-100">
+                              <btn.icon className="w-5 h-5 md:w-6 md:h-6 text-stone-400 group-hover:text-champagne-500 disabled:group-hover:text-stone-400" />
+                              <span className="text-[10px] font-bold text-stone-600">{btn.label}</span>
+                           </button>
+                        ))}
                      </div>
                   </div>
 
                   <div className="pt-4 border-t border-stone-100 flex flex-col gap-3">
-                     <button 
-                        onClick={() => handleToggleFavorite()} 
-                        disabled={isGenerating}
-                        className={`w-full py-3 rounded-xl border font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${isSaved ? 'bg-red-50 border-red-200 text-red-500' : 'border-stone-200 text-stone-600 hover:border-stone-400'} disabled:opacity-50 disabled:cursor-not-allowed`}
-                     >
+                     <button onClick={() => handleToggleFavorite()} disabled={isGenerating} className={`w-full py-3 rounded-xl border font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${isSaved ? 'bg-red-50 border-red-200 text-red-500' : 'border-stone-200 text-stone-600 hover:border-stone-400'} disabled:opacity-50 disabled:cursor-not-allowed`}>
                         <Heart className={`w-4 h-4 ${isSaved ? 'fill-current' : ''}`} /> {isSaved ? '已收藏' : '收藏设计'}
                      </button>
-                     <button 
-                        onClick={() => setAppState('CONFIGURING')} 
-                        disabled={isGenerating}
-                        className="w-full py-3 text-stone-400 text-xs hover:text-stone-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                     >
-                        返回参数配置
-                     </button>
+                     <button onClick={() => setAppState('CONFIGURING')} disabled={isGenerating} className="w-full py-3 text-stone-400 text-xs hover:text-stone-600 disabled:opacity-50 disabled:cursor-not-allowed">返回参数配置</button>
                   </div>
                </div>
             ) : (
                /* Config Mode */
                <div className="p-5 md:p-8 pb-32 md:pb-8">
-                 {/* Back to Studio Button - Only if we have a generated image */}
                  {generatedImage && (
-                    <button 
-                      onClick={() => setAppState('RESULT')}
-                      className="w-full mb-6 py-3 bg-stone-100 text-stone-600 rounded-xl font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-stone-200 transition-all border border-stone-200 hover:border-stone-300"
-                    >
+                    <button onClick={() => setAppState('RESULT')} className="w-full mb-6 py-3 bg-stone-100 text-stone-600 rounded-xl font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-stone-200 transition-all border border-stone-200 hover:border-stone-300">
                        <Wand2 className="w-4 h-4 text-champagne-500" /> 返回创意工坊
                     </button>
                  )}
-
                  <ConfigPanel config={config} setConfig={setConfig} onGenerate={handleGenerate} isGenerating={isGenerating} disabled={!originalImage} />
-                 
-                 {/* Mobile Sticky Button - Positioned absolute to the scroll container or fixed to bottom of panel */}
                  {originalImage && (
                     <div className="md:hidden fixed bottom-0 left-0 right-0 p-4 bg-white/95 backdrop-blur border-t border-stone-100 z-50">
                       <button onClick={handleGenerate} disabled={isGenerating} className="w-full bg-stone-900 text-white py-3.5 rounded-xl font-bold tracking-[0.2em] uppercase flex items-center justify-center gap-2 shadow-xl disabled:opacity-50">
@@ -640,7 +560,6 @@ function App() {
             )}
           </div>
         </div>
-
       </main>
 
       {/* History Drawer */}
@@ -650,14 +569,8 @@ function App() {
         savedHistory={savedCollection}
         recentHistory={recentHistory}
         onSelect={handleSelectHistoryItem} 
-        onDelete={(id, e) => { 
-           e.stopPropagation(); 
-           setSavedCollection(h => h.filter(i => i.id !== id)); 
-        }}
-        onToggleSave={(id, e) => {
-           e.stopPropagation();
-           handleToggleFavorite(id);
-        }}
+        onDelete={(id, e) => { e.stopPropagation(); setSavedCollection(h => h.filter(i => i.id !== id)); }}
+        onToggleSave={(id, e) => { e.stopPropagation(); handleToggleFavorite(id); }}
         savedIds={new Set(savedCollection.map(i => i.id))}
       />
       
@@ -683,68 +596,30 @@ function App() {
         <div className="fixed inset-0 bg-stone-900/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-scale-in">
               <div className="p-6 text-center space-y-4">
-                 <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center mx-auto">
-                    <AlertTriangle className="w-6 h-6 text-red-500" />
-                 </div>
+                 <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center mx-auto"><AlertTriangle className="w-6 h-6 text-red-500" /></div>
                  <h3 className="text-lg font-serif font-bold text-stone-900">确认停止生成？</h3>
-                 <p className="text-sm text-stone-600 leading-relaxed">
-                    停止当前任务将无法获得结果，但系统<span className="font-bold text-red-500">依然会扣除</span>本次生成的算力费用。
-                 </p>
+                 <p className="text-sm text-stone-600 leading-relaxed">停止当前任务将无法获得结果，但系统<span className="font-bold text-red-500">依然会扣除</span>本次生成的算力费用。</p>
                  <div className="flex gap-3 pt-2">
-                    <button 
-                       onClick={cancelStopTask}
-                       className="flex-1 py-3 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-xl text-xs font-bold uppercase tracking-wider"
-                    >
-                       继续生成
-                    </button>
-                    <button 
-                       onClick={confirmStopTask}
-                       className="flex-1 py-3 bg-red-500 hover:bg-red-600 text-white rounded-xl text-xs font-bold uppercase tracking-wider"
-                    >
-                       确认停止
-                    </button>
+                    <button onClick={cancelStopTask} className="flex-1 py-3 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-xl text-xs font-bold uppercase tracking-wider">继续生成</button>
+                    <button onClick={confirmStopTask} className="flex-1 py-3 bg-red-500 hover:bg-red-600 text-white rounded-xl text-xs font-bold uppercase tracking-wider">确认停止</button>
                  </div>
               </div>
            </div>
         </div>
       )}
 
-      {/* Full Screen Image Modal (LightBox) */}
+      {/* Full Screen Image Modal */}
       {isImageZoomed && generatedImage && (
         <div className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-xl animate-fade-in flex flex-col">
-          {/* Lightbox Header */}
           <div className="flex-none p-4 md:p-6 flex justify-between items-center text-white/80">
-             <div className="flex items-center gap-3">
-               <span className="text-xs font-bold tracking-[0.2em] uppercase text-champagne-400">Preview Mode</span>
-             </div>
-             <button 
-                onClick={() => setIsImageZoomed(false)}
-                className="p-2 rounded-full hover:bg-white/10 transition-colors"
-             >
-                <X className="w-6 h-6" />
-             </button>
+             <div className="flex items-center gap-3"><span className="text-xs font-bold tracking-[0.2em] uppercase text-champagne-400">Preview Mode</span></div>
+             <button onClick={() => setIsImageZoomed(false)} className="p-2 rounded-full hover:bg-white/10 transition-colors"><X className="w-6 h-6" /></button>
           </div>
-
-          {/* Lightbox Content */}
           <div className="flex-1 flex items-center justify-center p-4 md:p-8 overflow-hidden relative select-none">
-             <img 
-               src={showOriginalInZoom && originalImage ? originalImage : generatedImage} 
-               className="max-w-full max-h-full object-contain shadow-2xl transition-opacity duration-200"
-               style={{ opacity: 1 }}
-             />
-             
-             {/* "Hold to Compare" Hint */}
+             <img src={showOriginalInZoom && originalImage ? originalImage : generatedImage} className="max-w-full max-h-full object-contain shadow-2xl transition-opacity duration-200" style={{ opacity: 1 }} />
              {originalImage && (
-               <button
-                  onMouseDown={() => setShowOriginalInZoom(true)}
-                  onMouseUp={() => setShowOriginalInZoom(false)}
-                  onMouseLeave={() => setShowOriginalInZoom(false)}
-                  onTouchStart={() => setShowOriginalInZoom(true)}
-                  onTouchEnd={() => setShowOriginalInZoom(false)}
-                  className="absolute bottom-8 left-1/2 -translate-x-1/2 bg-white/10 backdrop-blur-md border border-white/20 text-white px-6 py-2.5 rounded-full text-xs font-bold tracking-widest hover:bg-white/20 transition-all flex items-center gap-2 select-none active:scale-95"
-               >
-                 <Eye className="w-4 h-4" />
-                 {showOriginalInZoom ? '松开恢复' : '按住对比原图'}
+               <button onMouseDown={() => setShowOriginalInZoom(true)} onMouseUp={() => setShowOriginalInZoom(false)} onMouseLeave={() => setShowOriginalInZoom(false)} onTouchStart={() => setShowOriginalInZoom(true)} onTouchEnd={() => setShowOriginalInZoom(false)} className="absolute bottom-8 left-1/2 -translate-x-1/2 bg-white/10 backdrop-blur-md border border-white/20 text-white px-6 py-2.5 rounded-full text-xs font-bold tracking-widest hover:bg-white/20 transition-all flex items-center gap-2 select-none active:scale-95">
+                 <Eye className="w-4 h-4" /> {showOriginalInZoom ? '松开恢复' : '按住对比原图'}
                </button>
              )}
           </div>
