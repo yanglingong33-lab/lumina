@@ -1,6 +1,5 @@
-
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { Pencil, Eraser, Move, Undo2, Trash2, Check, X, Palette, Circle, Star, Heart, Sparkles, SlidersHorizontal, ZoomIn, ZoomOut, Hand, Maximize, GripVertical } from 'lucide-react';
+import { Pencil, Eraser, Move, Undo2, Trash2, Check, X, Palette, Circle, Star, Heart, Sparkles, SlidersHorizontal, ZoomIn, ZoomOut, Hand, Maximize, GripVertical, RotateCw } from 'lucide-react';
 
 // --- Assets / Icons for Gems ---
 const GEM_ASSETS = [
@@ -18,6 +17,7 @@ interface GemObject {
   x: number;
   y: number;
   size: number;
+  rotation: number;
 }
 
 interface CreativeCanvasProps {
@@ -57,9 +57,10 @@ const CreativeCanvas: React.FC<CreativeCanvasProps> = ({ onConfirm, onCancel }) 
   const [selectedGemId, setSelectedGemId] = useState<string | null>(null);
   const [history, setHistory] = useState<ImageData[]>([]);
   
-  // Dragging/Resizing Logic
+  // Dragging/Resizing/Rotating Logic
   const [isDraggingGem, setIsDraggingGem] = useState(false);
   const [isResizingGem, setIsResizingGem] = useState(false);
+  const [isRotatingGem, setIsRotatingGem] = useState(false);
   
   // Drawing Interpolation
   const lastPos = useRef<{x: number, y: number} | null>(null);
@@ -255,8 +256,8 @@ const CreativeCanvas: React.FC<CreativeCanvasProps> = ({ onConfirm, onCancel }) 
       return;
     }
 
-    // Handle Gem Move/Resize is handled in the Gem element events directly
-    if (isDraggingGem || isResizingGem) return;
+    // Handle Gem Move/Resize/Rotate is handled in the Gem element events directly
+    if (isDraggingGem || isResizingGem || isRotatingGem) return;
     
     // Handle Drawing
     if (tool !== 'move' && context) {
@@ -404,7 +405,8 @@ const CreativeCanvas: React.FC<CreativeCanvasProps> = ({ onConfirm, onCancel }) 
       typeId,
       x: centerX * scaleX - 20, // Centered
       y: centerY * scaleY - 20,
-      size: 40
+      size: 40,
+      rotation: 0
     };
     setGems([...gems, newGem]);
     setSelectedGemId(newGem.uniqueId);
@@ -440,11 +442,14 @@ const CreativeCanvas: React.FC<CreativeCanvasProps> = ({ onConfirm, onCancel }) 
       const r = gem.size / 2;
 
       tempCtx.save();
+      tempCtx.translate(cx, cy);
+      tempCtx.rotate((gem.rotation || 0) * Math.PI / 180);
+
       tempCtx.fillStyle = asset.color;
       tempCtx.strokeStyle = asset.border;
       tempCtx.lineWidth = 2;
-      tempCtx.translate(cx, cy);
-
+      // Drawing logic assumes center is at (0,0) after translation
+      
       if (asset.shape === 'circle') {
         tempCtx.beginPath();
         tempCtx.arc(0, 0, r, 0, Math.PI * 2);
@@ -614,7 +619,8 @@ const CreativeCanvas: React.FC<CreativeCanvasProps> = ({ onConfirm, onCancel }) 
                            top: gem.y, 
                            width: gem.size, 
                            height: gem.size,
-                           cursor: tool === 'move' ? 'move' : 'default'
+                           cursor: tool === 'move' ? 'move' : 'default',
+                           transform: `rotate(${gem.rotation || 0}deg)`
                          }}
                          onMouseDown={(e) => {
                            if (tool !== 'move') return;
@@ -651,35 +657,99 @@ const CreativeCanvas: React.FC<CreativeCanvasProps> = ({ onConfirm, onCancel }) 
                            window.addEventListener('touchmove', handleMove); window.addEventListener('touchend', handleUp);
                          }}
                        >
-                         {/* Selection Box & Resize Handle */}
+                         {/* Selection Controls */}
                          {isSelected && (
                            <>
+                              {/* Selection Box */}
                               <div className="absolute -inset-1 border border-champagne-500 rounded-sm pointer-events-none"></div>
+                              
+                              {/* Rotation Handle (Top Center) */}
+                              <div 
+                                className="absolute -top-8 left-1/2 -translate-x-1/2 w-6 h-6 bg-white border border-champagne-500 rounded-full shadow-sm z-50 flex items-center justify-center cursor-grab active:cursor-grabbing pointer-events-auto"
+                                onMouseDown={(e) => {
+                                  e.stopPropagation();
+                                  setIsRotatingGem(true);
+                                  const center = { x: gem.x + gem.size / 2, y: gem.y + gem.size / 2 };
+                                  
+                                  const handleRotate = (ev: MouseEvent) => {
+                                      const pos = getCanvasPoint(ev);
+                                      const angle = Math.atan2(pos.y - center.y, pos.x - center.x);
+                                      // Convert to degrees, add 90 because handle is at top (-90 deg from x-axis)
+                                      const deg = angle * (180 / Math.PI) + 90;
+                                      setGems(prev => prev.map(g => g.uniqueId === gem.uniqueId ? { ...g, rotation: deg } : g));
+                                  };
+                                  
+                                  const stopRotate = () => { setIsRotatingGem(false); window.removeEventListener('mousemove', handleRotate); window.removeEventListener('mouseup', stopRotate); };
+                                  window.addEventListener('mousemove', handleRotate); window.addEventListener('mouseup', stopRotate);
+                                }}
+                                onTouchStart={(e) => {
+                                  e.stopPropagation();
+                                  setIsRotatingGem(true);
+                                  const center = { x: gem.x + gem.size / 2, y: gem.y + gem.size / 2 };
+                                  
+                                  const handleRotate = (ev: TouchEvent) => {
+                                      const pos = getCanvasPoint(ev);
+                                      const angle = Math.atan2(pos.y - center.y, pos.x - center.x);
+                                      const deg = angle * (180 / Math.PI) + 90;
+                                      setGems(prev => prev.map(g => g.uniqueId === gem.uniqueId ? { ...g, rotation: deg } : g));
+                                  };
+                                  
+                                  const stopRotate = () => { setIsRotatingGem(false); window.removeEventListener('touchmove', handleRotate); window.removeEventListener('touchend', stopRotate); };
+                                  window.addEventListener('touchmove', handleRotate); window.addEventListener('touchend', stopRotate);
+                                }}
+                              >
+                                  <RotateCw className="w-3 h-3 text-champagne-500" />
+                              </div>
+                              <div className="absolute -top-8 left-1/2 -translate-x-1/2 h-8 w-px bg-champagne-500 pointer-events-none"></div>
+
                               {/* Resize Handle (Bottom Right) */}
                               <div 
                                  className="absolute -bottom-2 -right-2 w-5 h-5 bg-white border border-champagne-500 rounded-full shadow-sm z-50 flex items-center justify-center cursor-nwse-resize pointer-events-auto"
                                  onMouseDown={(e) => {
                                     e.stopPropagation();
                                     setIsResizingGem(true);
-                                    const initX = e.clientX;
+                                    const center = { x: gem.x + gem.size / 2, y: gem.y + gem.size / 2 };
+                                    const initPos = getCanvasPoint(e);
+                                    const initDist = Math.hypot(initPos.x - center.x, initPos.y - center.y);
                                     const initSize = gem.size;
+                                    
                                     const handleResize = (ev: MouseEvent) => {
-                                       // Calculate new size based on diagonal movement distance
-                                       const delta = (ev.clientX - initX) / zoom;
-                                       setGems(prev => prev.map(g => g.uniqueId === gem.uniqueId ? { ...g, size: Math.max(10, initSize + delta) } : g));
+                                       const pos = getCanvasPoint(ev);
+                                       const currDist = Math.hypot(pos.x - center.x, pos.y - center.y);
+                                       const scale = currDist / initDist;
+                                       const newSize = Math.max(10, initSize * scale);
+                                       // Resize from center
+                                       setGems(prev => prev.map(g => g.uniqueId === gem.uniqueId ? { 
+                                          ...g, 
+                                          size: newSize,
+                                          x: center.x - newSize / 2,
+                                          y: center.y - newSize / 2
+                                       } : g));
                                     };
                                     const stopResize = () => { setIsResizingGem(false); window.removeEventListener('mousemove', handleResize); window.removeEventListener('mouseup', stopResize); };
                                     window.addEventListener('mousemove', handleResize); window.addEventListener('mouseup', stopResize);
                                  }}
                                  onTouchStart={(e) => {
                                     e.stopPropagation();
-                                    const initX = e.touches[0].clientX;
+                                    setIsResizingGem(true);
+                                    const center = { x: gem.x + gem.size / 2, y: gem.y + gem.size / 2 };
+                                    const initPos = getCanvasPoint(e);
+                                    const initDist = Math.hypot(initPos.x - center.x, initPos.y - center.y);
                                     const initSize = gem.size;
+
                                     const handleResize = (ev: TouchEvent) => {
-                                       const delta = (ev.touches[0].clientX - initX) / zoom;
-                                       setGems(prev => prev.map(g => g.uniqueId === gem.uniqueId ? { ...g, size: Math.max(10, initSize + delta) } : g));
+                                       const pos = getCanvasPoint(ev);
+                                       const currDist = Math.hypot(pos.x - center.x, pos.y - center.y);
+                                       const scale = currDist / initDist;
+                                       const newSize = Math.max(10, initSize * scale);
+                                       setGems(prev => prev.map(g => g.uniqueId === gem.uniqueId ? { 
+                                          ...g, 
+                                          size: newSize,
+                                          x: center.x - newSize / 2,
+                                          y: center.y - newSize / 2
+                                       } : g));
                                     };
-                                    const stopResize = () => { window.removeEventListener('touchmove', handleResize); window.removeEventListener('touchend', stopResize); };
+                                    const stopResize = () => { setIsResizingGem(false); window.removeEventListener('touchmove', handleResize); window.removeEventListener('touchend', stopResize); };
                                     window.addEventListener('touchmove', handleResize); window.addEventListener('touchend', stopResize);
                                  }}
                               >

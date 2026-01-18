@@ -8,7 +8,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, (process as any).cwd(), '');
   
   // Safely get the API key from possible variables
-  const apiKey = env.API_KEY || env.OPEN_API_KEY || env.BOYI || '';
+  const apiKey = env.API_KEY || env.OPEN_API_KEY || env.BOYI || 'sk-vkQ5Q2K7Ap8BkQujcjVeFE9xMRrQbJaIR0vo8pP7Jj5aqpR4';
   
   return {
     plugins: [react()],
