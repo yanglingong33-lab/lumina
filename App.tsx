@@ -124,7 +124,8 @@ function App() {
     setGeneratedDescription(null);
     setIsSaved(false);
     setCurrentDesignId(null);
-    setVariations([]); // New generation clears old variations
+    // Note: variations clearing happens below inside success flow or we can do it here
+    setVariations([]); 
     setShowDescription(true);
 
     try {
@@ -134,9 +135,22 @@ function App() {
       setGeneratedDescription("正在撰写设计理念..."); // Placeholder
       setAppState('RESULT'); // Show result immediately
 
+      // Create the Base Variation Item Immediately
+      const baseId = Date.now().toString();
+      const baseItem: VariationItem = {
+        id: baseId,
+        mode: VariationMode.ORIGINAL,
+        image: imageResult.image,
+        description: "正在撰写设计理念..."
+      };
+      setVariations([baseItem]);
+
       // Step 2: Generate Concept Text (using original image as context)
       const conceptText = await generateDesignConcept(originalImage, config);
       setGeneratedDescription(conceptText);
+      
+      // Update the base item with the actual description
+      setVariations(prev => prev.map(v => v.id === baseId ? { ...v, description: conceptText } : v));
       
       // Save history with full data
       addToRecentHistory(imageResult.image, conceptText);
@@ -258,8 +272,27 @@ function App() {
     setAppState('RESULT');
     setIsHistoryOpen(false);
     setCurrentDesignId(item.id);
-    setVariations([]);
+    
+    // When loading from history, we should ideally populate the variations list with just this one item 
+    // to keep the UI consistent, or leave it empty if we don't track variations in history items separately.
+    // For now, let's treat it as a new "Original" item in the gallery.
+    setVariations([{
+      id: item.id,
+      mode: VariationMode.ORIGINAL,
+      image: item.generatedImage,
+      description: item.designDescription || '历史记录'
+    }]);
+
     setShowDescription(true);
+  };
+
+  const getVariationLabel = (v: VariationItem) => {
+    if (v.mode === VariationMode.ORIGINAL) return "原创设计";
+    if (v.mode === VariationMode.REFINE) return "细节调整";
+    if (v.mode === VariationMode.VIEWS) return "三视图";
+    if (v.mode === VariationMode.MODEL) return "模特佩戴";
+    if (v.mode === VariationMode.PHOTO) return "摄影大片";
+    return v.description || "变体";
   };
 
   return (
@@ -328,15 +361,22 @@ function App() {
                     )}
                  </div>
 
-                 {/* Creative Studio / Variations Gallery - Only show in RESULT mode to keep Config mode clean? Or always?
-                     Let's show it if we have variations and we are NOT in config mode, OR maybe just stick to RESULT mode for this.
-                  */}
+                 {/* Creative Studio / Variations Gallery */}
                  {appState === 'RESULT' && !isGenerating && (
                    <div className="h-20 md:h-32 w-full flex-shrink-0 flex gap-2 md:gap-3 overflow-x-auto custom-scrollbar px-1 pb-1">
                       {variations.map((v) => (
-                        <div key={v.id} onClick={() => handleSelectVariation(v)} className="relative h-full aspect-square flex-shrink-0 rounded-lg overflow-hidden border-2 border-transparent hover:border-champagne-400 cursor-pointer group">
+                        <div 
+                          key={v.id} 
+                          onClick={() => handleSelectVariation(v)} 
+                          className={`
+                            relative h-full aspect-square flex-shrink-0 rounded-lg overflow-hidden cursor-pointer group transition-all duration-300
+                            ${generatedImage === v.image ? 'border-2 border-champagne-500 ring-2 ring-champagne-200' : 'border border-stone-200 hover:border-champagne-300'}
+                          `}
+                        >
                            <img src={v.image} className="w-full h-full object-cover" />
-                           <div className="absolute bottom-0 inset-x-0 bg-black/60 p-1 text-[8px] md:text-[9px] text-white text-center truncate">{v.description || v.mode}</div>
+                           <div className={`absolute bottom-0 inset-x-0 p-1 text-[8px] md:text-[9px] text-white text-center truncate ${generatedImage === v.image ? 'bg-champagne-600/90' : 'bg-black/60'}`}>
+                             {getVariationLabel(v)}
+                           </div>
                         </div>
                       ))}
                       <div ref={variationsEndRef} />

@@ -99,6 +99,7 @@ export type AppState = 'IDLE' | 'CONFIGURING' | 'GENERATING' | 'RESULT';
 
 // New types for variations
 export enum VariationMode {
+  ORIGINAL = 'ORIGINAL', // Original base design
   REFINE = 'REFINE', // Text edit
   VIEWS = 'VIEWS',   // 3-views
   MODEL = 'MODEL',   // On Model
