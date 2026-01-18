@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { DesignConfig, MetalType, GemstoneType, JewelryType, ViewAngle, ImageSize, AspectRatio } from '../types';
-import { Loader2, Sparkles, ChevronDown, Feather, Check } from 'lucide-react';
+import { Loader2, Sparkles, ChevronDown, Check } from 'lucide-react';
 
 interface ConfigPanelProps {
   config: DesignConfig;
@@ -9,7 +9,6 @@ interface ConfigPanelProps {
   onGenerate: () => void;
   isGenerating: boolean;
   disabled: boolean;
-  generatedDescription?: string | null;
 }
 
 interface CustomSelectProps {
@@ -119,7 +118,7 @@ const CustomSelect: React.FC<CustomSelectProps> = ({ label, value, onChange, opt
   );
 };
 
-const ConfigPanel: React.FC<ConfigPanelProps> = ({ config, setConfig, onGenerate, isGenerating, disabled, generatedDescription }) => {
+const ConfigPanel: React.FC<ConfigPanelProps> = ({ config, setConfig, onGenerate, isGenerating, disabled }) => {
   
   const handleChange = (field: keyof DesignConfig, value: string) => {
     setConfig(prev => ({ ...prev, [field]: value }));
@@ -128,51 +127,10 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ config, setConfig, onGenerate
   return (
     <div className="flex flex-col space-y-8 pb-10">
       
-      {generatedDescription ? (
-        <div className="animate-fade-in-up opacity-0 fill-mode-forwards">
-          {/* Elegant Designer Note Card */}
-          <div className="relative bg-[#FFFCF9] border border-stone-200 rounded-lg shadow-[0_15px_30px_-10px_rgba(0,0,0,0.08)] mb-4 overflow-hidden">
-            {/* Top decorative accent */}
-            <div className="h-1 w-full bg-gradient-to-r from-stone-200 via-champagne-400 to-stone-200 opacity-50"></div>
-            
-            <div className="p-6 md:p-7 relative">
-               {/* Background Watermark */}
-               <div className="absolute right-[-20px] top-[-20px] opacity-[0.03] pointer-events-none transform rotate-12">
-                  <Feather className="w-40 h-40 text-stone-900" />
-               </div>
-
-               <div className="flex items-center gap-2 mb-4 animate-fade-in delay-200">
-                  <span className="h-px w-6 bg-champagne-400"></span>
-                  <h3 className="font-serif text-stone-900 text-lg tracking-wide italic">Design Concept</h3>
-                  <span className="h-px w-full bg-stone-100"></span>
-               </div>
-
-               <div className="relative z-10 animate-fade-in-up delay-300">
-                  <p className="font-serif text-stone-600 text-sm md:text-[15px] leading-8 text-justify tracking-wide first-letter:text-3xl first-letter:font-serif first-letter:text-champagne-500 first-letter:float-left first-letter:mr-2 first-letter:mt-[-5px]">
-                    {generatedDescription}
-                  </p>
-               </div>
-
-               <div className="mt-6 flex justify-between items-end border-t border-stone-100 pt-4 animate-fade-in delay-500">
-                  <div className="flex flex-col">
-                     <span className="text-[9px] text-stone-400 uppercase tracking-widest font-sans">Date</span>
-                     <span className="text-[10px] text-stone-600 font-serif">{new Date().toLocaleDateString()}</span>
-                  </div>
-                  <div className="flex flex-col items-end">
-                     <span className="text-[9px] text-stone-400 uppercase tracking-widest font-sans">Designed by</span>
-                     <span className="font-serif text-stone-800 text-xs italic">Lumina AI Atelier</span>
-                  </div>
-               </div>
-            </div>
-          </div>
-          <div className="my-6 border-b border-stone-100"></div>
-        </div>
-      ) : (
-        <div className="space-y-2 animate-fade-in-up opacity-0 fill-mode-forwards" style={{ animationDelay: '0ms' }}>
-          <h2 className="text-2xl md:text-3xl font-serif text-stone-900">Design Studio</h2>
-          <p className="text-xs text-stone-500 font-medium tracking-wide">CUSTOMIZE YOUR JEWELRY</p>
-        </div>
-      )}
+      <div className="space-y-2 animate-fade-in-up opacity-0 fill-mode-forwards" style={{ animationDelay: '0ms' }}>
+        <h2 className="text-2xl md:text-3xl font-serif text-stone-900">Design Studio</h2>
+        <p className="text-xs text-stone-500 font-medium tracking-wide">CUSTOMIZE YOUR JEWELRY</p>
+      </div>
 
       <div className="space-y-6">
         <div className="grid grid-cols-2 gap-4 md:gap-6 relative z-30">
@@ -310,7 +268,7 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ config, setConfig, onGenerate
                    ${disabled ? 'text-stone-400' : 'text-stone-200 group-hover:text-white'}
                    transition-colors duration-300
                 `}>
-                   {generatedDescription ? 'Regenerate Design' : 'Generate Design'}
+                   Generate Design
                 </span>
               </>
             )}

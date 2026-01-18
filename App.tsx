@@ -1,12 +1,12 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { DesignConfig, MetalType, GemstoneType, JewelryType, ViewAngle, ImageSize, AspectRatio, AppState, DesignHistoryItem, AppSettings, VariationMode, VariationItem } from './types';
-import { generateJewelryDesign, generateJewelryVariation } from './services/geminiService';
+import { generateJewelryDesign, generateJewelryVariation, generateDesignConcept } from './services/geminiService';
 import ComparisonSlider from './components/ComparisonSlider';
 import ConfigPanel from './components/ConfigPanel';
 import ImageUploader from './components/ImageUploader';
 import HistoryDrawer from './components/HistoryDrawer';
-import { Gem, Download, Trash2, Loader2, Sparkles, Heart, Settings, X, Save, Wand2, Layers, User, Camera, Send, Edit, History, ArrowLeft } from 'lucide-react';
+import { Gem, Download, Trash2, Loader2, Sparkles, Heart, Settings, X, Save, Wand2, Layers, User, Camera, Send, Edit, History, ArrowLeft, Feather, ChevronDown, ChevronUp } from 'lucide-react';
 
 const LOADING_STEPS = ["Analyzing Geometry...", "Refining Details...", "Simulating Light...", "Mastering Texture..."];
 
@@ -42,6 +42,7 @@ function App() {
   const [isRefining, setIsRefining] = useState(false);
   const [refineText, setRefineText] = useState("");
   const variationsEndRef = useRef<HTMLDivElement>(null);
+  const [showDescription, setShowDescription] = useState(true);
 
   // Persist State
   useEffect(() => { localStorage.setItem('lumina_collection', JSON.stringify(savedCollection)); }, [savedCollection]);
@@ -89,6 +90,7 @@ function App() {
     setIsSaved(false);
     setCurrentDesignId(null);
     setVariations([]); // Clear variations on new image
+    setShowDescription(true);
   };
 
   const addToRecentHistory = (resultImage: string, resultDesc: string) => {
@@ -123,15 +125,21 @@ function App() {
     setIsSaved(false);
     setCurrentDesignId(null);
     setVariations([]); // New generation clears old variations
+    setShowDescription(true);
 
     try {
-      const result = await generateJewelryDesign(originalImage, config);
-      setGeneratedImage(result.image);
-      setGeneratedDescription(result.description);
-      setAppState('RESULT');
+      // Step 1: Generate Image
+      const imageResult = await generateJewelryDesign(originalImage, config);
+      setGeneratedImage(imageResult.image);
+      setGeneratedDescription("正在撰写设计理念..."); // Placeholder
+      setAppState('RESULT'); // Show result immediately
+
+      // Step 2: Generate Concept Text (using original image as context)
+      const conceptText = await generateDesignConcept(originalImage, config);
+      setGeneratedDescription(conceptText);
       
-      // Auto-save to history
-      addToRecentHistory(result.image, result.description);
+      // Save history with full data
+      addToRecentHistory(imageResult.image, conceptText);
 
     } catch (err: any) {
       setError(err.message.includes("AUTH_ERROR") ? err.message.replace("AUTH_ERROR: ", "") : (err.message || '生成失败'));
@@ -168,8 +176,6 @@ function App() {
         setGeneratedDescription(result.description);
         setRefineText("");
         setIsRefining(false);
-        // Also add refinements to history? Optional. 
-        // Let's add significant refinements (text edits) to history as well
         addToRecentHistory(result.image, result.description);
       } else {
         setTimeout(() => variationsEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
@@ -253,6 +259,7 @@ function App() {
     setIsHistoryOpen(false);
     setCurrentDesignId(item.id);
     setVariations([]);
+    setShowDescription(true);
   };
 
   return (
@@ -361,6 +368,55 @@ function App() {
                     <p className="text-[10px] md:text-xs text-stone-500">CREATIVE STUDIO & REFINEMENT</p>
                   </div>
 
+                  {/* Design Concept Card - Collapsible */}
+                  {generatedDescription && (
+                    <div className="animate-fade-in-up delay-100">
+                      <button 
+                        onClick={() => setShowDescription(!showDescription)}
+                        className="w-full flex items-center justify-between mb-2 group"
+                      >
+                         <div className="flex items-center gap-2">
+                            <div className="h-px w-6 bg-champagne-400"></div>
+                            <span className="font-serif text-stone-900 text-sm tracking-wide italic">Design Concept</span>
+                         </div>
+                         <div className="text-stone-400 group-hover:text-champagne-500 transition-colors">
+                            {showDescription ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                         </div>
+                      </button>
+
+                      {showDescription && (
+                        <div className="relative bg-[#FFFCF9] border border-stone-200 rounded-lg shadow-[0_15px_30px_-10px_rgba(0,0,0,0.08)] overflow-hidden transition-all duration-300">
+                          {/* Top decorative accent */}
+                          <div className="h-1 w-full bg-gradient-to-r from-stone-200 via-champagne-400 to-stone-200 opacity-50"></div>
+                          
+                          <div className="p-5 md:p-6 relative">
+                             {/* Background Watermark */}
+                             <div className="absolute right-[-20px] top-[-20px] opacity-[0.03] pointer-events-none transform rotate-12">
+                                <Feather className="w-32 h-32 text-stone-900" />
+                             </div>
+
+                             <div className="relative z-10">
+                                <p className="font-serif text-stone-600 text-sm md:text-[15px] leading-7 text-justify tracking-wide first-letter:text-2xl first-letter:font-serif first-letter:text-champagne-500 first-letter:float-left first-letter:mr-1.5 first-letter:mt-[-2px]">
+                                  {generatedDescription}
+                                </p>
+                             </div>
+
+                             <div className="mt-4 flex justify-between items-end border-t border-stone-100 pt-3">
+                                <div className="flex flex-col">
+                                   <span className="text-[9px] text-stone-400 uppercase tracking-widest font-sans">Date</span>
+                                   <span className="text-[10px] text-stone-600 font-serif">{new Date().toLocaleDateString()}</span>
+                                </div>
+                                <div className="flex flex-col items-end">
+                                   <span className="text-[9px] text-stone-400 uppercase tracking-widest font-sans">Designed by</span>
+                                   <span className="font-serif text-stone-800 text-xs italic">Lumina AI Atelier</span>
+                                </div>
+                             </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <div className="space-y-3">
                      <label className="text-[10px] font-bold uppercase tracking-widest text-stone-400">智能修改 (Refine)</label>
                      <div className="flex gap-2">
@@ -423,7 +479,7 @@ function App() {
                     </button>
                  )}
 
-                 <ConfigPanel config={config} setConfig={setConfig} onGenerate={handleGenerate} isGenerating={isGenerating} disabled={!originalImage} generatedDescription={generatedDescription} />
+                 <ConfigPanel config={config} setConfig={setConfig} onGenerate={handleGenerate} isGenerating={isGenerating} disabled={!originalImage} />
                  
                  {/* Mobile Sticky Button - Positioned absolute to the scroll container or fixed to bottom of panel */}
                  {originalImage && (

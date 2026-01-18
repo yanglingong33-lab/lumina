@@ -6,13 +6,26 @@ import { DesignConfig, GenerationResult, AppSettings, VariationMode } from "../t
 const DEFAULT_BASE_URL = "https://api.apimart.ai";
 // Revert to the official stable preview as primary
 const DEFAULT_MODEL = "gemini-3-pro-image-preview"; 
+// Text model for concept generation
+const TEXT_MODEL = "gemini-2.0-flash";
 
 // Models to try if the primary one fails (in order)
 const FALLBACK_MODELS = [
-  'gemini-2.0-flash-exp',
-  'gemini-exp-1206',
-  'gemini-2.0-flash-thinking-exp-01-21'
+  'gemini-3-flash-preview',
+  'gemini-2.0-flash',
+  'gemini-2.0-pro-exp-02-05',
+  'gemini-2.0-flash-exp'
 ];
+
+const TYPE_TRANSLATIONS: Record<string, string> = {
+  '戒指': 'Ring',
+  '项链': 'Necklace',
+  '耳饰': 'Earrings',
+  '手镯': 'Bracelet',
+  '胸针': 'Brooch'
+};
+
+const getEnglishType = (type: string) => TYPE_TRANSLATIONS[type] || type;
 
 /**
  * Helper to get settings
@@ -46,7 +59,8 @@ const getSettings = () => {
 };
 
 /**
- * Generates a jewelry design based on an input image and configuration.
+ * Generates a jewelry design image based on an input image and configuration.
+ * STEP 1: Image Generation Only
  */
 export const generateJewelryDesign = async (
   base64Image: string,
@@ -60,19 +74,12 @@ export const generateJewelryDesign = async (
   const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
   const cleanBase64 = base64Image.replace(/^data:image\/[a-zA-Z+]+;base64,/, '');
 
-  // Revised Prompt for Maximum Realism
+  // Revised Prompt for Maximum Realism - IMAGE FOCUSED
   const prompt = `
     Role: Senior Haute Joaillerie Designer & Luxury Product Photographer.
     Task: Re-imagine the item in the image as a museum-grade luxury jewelry piece.
     
-    STEP 1: DESIGN CONCEPT (Output in Chinese)
-    Write a "设计理念" (Design Concept).
-    - Focus on craftsmanship: Explain the use of ${config.metal} and how ${config.gemstone} is set.
-    - Aesthetic narrative: Describe how the silhouette of the original object inspired this piece.
-    - Length: ~120 words.
-    
-    STEP 2: PHOTOREALISTIC VISUALIZATION
-    Render the design with the following strictly enforced photographic standards:
+    PHOTOREALISTIC VISUALIZATION SPECS:
     - Subject: A single ${config.type} made of polished ${config.metal}, featuring high-grade ${config.gemstone} and ${config.auxiliaryStone || 'refined detailing'}.
     - Perspective: ${config.viewAngle}.
     - Lighting: Professional studio softbox lighting.
@@ -82,7 +89,58 @@ export const generateJewelryDesign = async (
     Constraint: NO text, NO watermarks. The piece must feel physically heavy and correctly seated.
   `;
 
-  return executeGeneration(settings.apiKey, settings.baseUrl, prompt, cleanBase64, mimeType, config, settings.modelName);
+  // We only expect an image here
+  const result = await executeGeneration(settings.apiKey, settings.baseUrl, prompt, cleanBase64, mimeType, config, settings.modelName, 'image');
+  return {
+    image: result.image,
+    description: "正在撰写设计理念..." // Placeholder
+  };
+};
+
+/**
+ * Generates the design concept text.
+ * STEP 2: Text Generation Only
+ */
+export const generateDesignConcept = async (
+  base64Image: string,
+  config: DesignConfig
+): Promise<string> => {
+  const settings = getSettings();
+  if (!settings.apiKey) throw new Error("AUTH_ERROR: 未配置 API Key。");
+
+  const mimeMatch = base64Image.match(/^data:(image\/[a-zA-Z+]+);base64,/);
+  const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+  const cleanBase64 = base64Image.replace(/^data:image\/[a-zA-Z+]+;base64,/, '');
+
+  const prompt = `
+    Role: Senior Jewelry Designer.
+    Task: Write a "Design Concept" (设计理念) in Chinese based on the provided reference image and the design parameters.
+    
+    Design Parameters:
+    - Type: ${config.type}
+    - Material: ${config.metal}
+    - Gemstone: ${config.gemstone}
+    - Details: ${config.auxiliaryStone || 'Classic setting'}
+    - User Inspiration: ${config.description || 'None'}
+    
+    Requirements:
+    1. Title: Create a poetic 4-character Chinese title for this piece (e.g., "晨曦之露").
+    2. Concept: Describe the inspiration, craftsmanship, and the aesthetic narrative (approx. 100-120 words).
+    3. Tone: Elegant, luxurious, professional.
+    
+    Output Format:
+    Return ONLY the text. No markdown formatting like ** or ## around the title.
+    Start with the title, then a new line, then the concept body.
+  `;
+
+  // Use a faster/text-capable model for this step. No imageConfig needed.
+  try {
+    const result = await executeGeneration(settings.apiKey, settings.baseUrl, prompt, cleanBase64, mimeType, {}, TEXT_MODEL, 'text');
+    return result.description;
+  } catch (e) {
+    console.warn("Concept generation failed, using default.", e);
+    return "设计理念生成中..."; 
+  }
 };
 
 /**
@@ -102,6 +160,7 @@ export const generateJewelryVariation = async (
 
   let prompt = "";
   let aspectRatio = "1:1";
+  let fallbackDesc = "";
 
   switch (mode) {
     case VariationMode.REFINE:
@@ -114,6 +173,7 @@ export const generateJewelryVariation = async (
         - Maintain photorealistic quality (8k, octane render).
         - Output a short Chinese description of what was changed.
       `;
+      fallbackDesc = `修改: ${refinePrompt}`;
       break;
     case VariationMode.VIEWS:
       prompt = `
@@ -127,6 +187,7 @@ export const generateJewelryVariation = async (
         - Output description: "三视图生成完毕"
       `;
       aspectRatio = "16:9";
+      fallbackDesc = "三视图";
       break;
     case VariationMode.MODEL:
       prompt = `
@@ -140,6 +201,7 @@ export const generateJewelryVariation = async (
         - Output description: "模特佩戴效果展示"
       `;
       aspectRatio = "3:4";
+      fallbackDesc = "模特试戴";
       break;
     case VariationMode.PHOTO:
       prompt = `
@@ -152,6 +214,7 @@ export const generateJewelryVariation = async (
         - Output description: "商业摄影大片展示"
       `;
       aspectRatio = "4:3";
+      fallbackDesc = "摄影大片";
       break;
   }
 
@@ -161,27 +224,52 @@ export const generateJewelryVariation = async (
     aspectRatio: aspectRatio
   };
 
-  return executeGeneration(settings.apiKey, settings.baseUrl, prompt, cleanBase64, mimeType, variationConfig, settings.modelName);
+  const result = await executeGeneration(settings.apiKey, settings.baseUrl, prompt, cleanBase64, mimeType, variationConfig, settings.modelName, 'image');
+  return {
+    image: result.image,
+    description: result.description || fallbackDesc
+  };
 };
 
 // Shared execution logic
-const executeGeneration = async (apiKey: string, baseUrl: string, prompt: string, base64: string, mimeType: string, config: any, modelName: string) => {
+const executeGeneration = async (
+  apiKey: string, 
+  baseUrl: string, 
+  prompt: string, 
+  base64: string, 
+  mimeType: string, 
+  config: any, 
+  modelName: string,
+  expectedType: 'image' | 'text'
+): Promise<GenerationResult> => {
+
   const execute = async (currentKey: string, currentModel: string) => {
-    if (baseUrl || currentKey.startsWith('sk-')) {
-      return await generateViaProxy(baseUrl, currentKey, prompt, base64, mimeType, config, currentModel);
+    // Check if proxy (baseUrl exists and is not googleapis)
+    if (baseUrl && !baseUrl.includes('generativelanguage.googleapis.com')) {
+      return await generateViaProxy(baseUrl, currentKey, prompt, base64, mimeType, config, currentModel, expectedType);
     } else {
-      return await generateViaSDK(currentKey, prompt, base64, mimeType, config, currentModel);
+      return await generateViaSDK(currentKey, prompt, base64, mimeType, config, currentModel, expectedType);
     }
   };
 
   try {
     return await execute(apiKey, modelName);
   } catch (error: any) {
-    if ((error.message?.includes('AUTH_ERROR') || error.status === 401) && process.env.API_KEY) {
+    if ((error.message?.includes('AUTH_ERROR') || error.status === 401 || error.message?.includes('Invalid token')) && process.env.API_KEY) {
        console.warn("Retrying with system default key...");
        try {
          return await execute(process.env.API_KEY, modelName);
        } catch (retryError) { throw retryError; }
+    }
+    // Fallback logic for missing models
+    const isModelMissing = error.message && (error.message.includes('not found') || error.message.includes('404') || error.message.includes('503'));
+    if (isModelMissing) {
+       console.warn(`Model ${modelName} failed. Attempting fallbacks...`);
+       for (const fallbackModel of FALLBACK_MODELS) {
+         try {
+           return await execute(apiKey, fallbackModel);
+         } catch (fbError) { console.debug("Fallback failed", fallbackModel); }
+       }
     }
     throw error;
   }
@@ -196,7 +284,8 @@ async function generateViaSDK(
   base64Image: string, 
   mimeType: string,
   config: any,
-  modelName: string
+  modelName: string,
+  expectedType: 'image' | 'text'
 ): Promise<GenerationResult> {
   const ai = new GoogleGenAI({ apiKey });
   
@@ -219,10 +308,10 @@ async function generateViaSDK(
         ],
       },
       config: {
-        imageConfig: currentImageConfig,
+        imageConfig: Object.keys(currentImageConfig).length > 0 ? currentImageConfig : undefined,
       },
     });
-    return parseResponse(response);
+    return parseContentParts(response, expectedType);
   };
 
   try {
@@ -246,7 +335,8 @@ async function generateViaProxy(
   base64Image: string,
   mimeType: string,
   config: any,
-  modelName: string
+  modelName: string,
+  expectedType: 'image' | 'text'
 ): Promise<GenerationResult> {
   
   const makePayload = (model: string, level: 'full' | 'no-size') => {
@@ -276,8 +366,8 @@ async function generateViaProxy(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-        'x-goog-api-key': apiKey
+        // 'Authorization': `Bearer ${apiKey}`, // Removed: Can conflict with key param in some proxies
+        'x-goog-api-key': apiKey // Added: Standard header for key-based auth
       },
       body: JSON.stringify(makePayload(targetModel, level))
     });
@@ -287,29 +377,15 @@ async function generateViaProxy(
       let errJson;
       try { errJson = JSON.parse(errText); } catch(e) {}
       const errorMessage = errJson?.error?.message || errJson?.message || `HTTP ${response.status} Error`;
-      // Throw standard Error object
       throw new Error(errorMessage);
     }
     const data = await response.json();
-    return parseResponse(data);
+    return parseContentParts(data, expectedType);
   };
 
   try {
     return await performFetch(modelName, 'full');
   } catch (error: any) {
-    const isModelMissing = error.message && (error.message.includes('not found') || error.message.includes('404') || error.message.includes('503'));
-
-    if (isModelMissing) {
-       console.warn(`Model ${modelName} failed. Attempting fallbacks...`);
-       const fallbackCandidates = FALLBACK_MODELS.filter(m => m !== modelName);
-       for (const fallbackModel of fallbackCandidates) {
-         try {
-           return await performFetch(fallbackModel, 'no-size');
-         } catch (fbError: any) { if (fbError.message && fbError.message.includes('401')) throw fbError; }
-       }
-       throw new Error(`无法找到可用的画图模型。`);
-    }
-
     if (isRetryable400(error)) return await performFetch(modelName, 'no-size');
     handleError(error);
     throw error;
@@ -317,37 +393,48 @@ async function generateViaProxy(
 }
 
 function isRetryable400(error: any) {
-  // Check for status on error object if it exists (for custom error objects) or parse message
   const msg = error.message || '';
   return msg.includes('INVALID_ARGUMENT') || msg.includes('400');
 }
 
-function parseResponse(response: any): GenerationResult {
+/**
+ * Robust parsing of response parts
+ */
+function parseContentParts(response: any, expectedType: 'image' | 'text'): GenerationResult {
   let image = '';
   let description = '';
   const candidates = response.candidates || response.response?.candidates;
   
   if (candidates && candidates[0]?.content?.parts) {
     for (const part of candidates[0].content.parts) {
-      if (part.inlineData && part.inlineData.data) image = `data:image/png;base64,${part.inlineData.data}`;
-      else if (part.text) description += part.text;
+      // 1. Check for Inline Image
+      if (part.inlineData && part.inlineData.data) {
+        image = `data:image/png;base64,${part.inlineData.data}`;
+      }
+      // 2. Check for Text (which might contain markdown image)
+      else if (part.text) {
+        const text = part.text;
+        // Check for Markdown Image embedded in text
+        const imageMarkdownMatch = text.match(/!\[.*?\]\((data:image\/.*?;base64,.*?)\)/);
+        if (imageMarkdownMatch && imageMarkdownMatch[1]) {
+           image = imageMarkdownMatch[1];
+           // Remove the image string from description
+           description += text.replace(imageMarkdownMatch[0], '');
+        } else {
+           description += text;
+        }
+      }
     }
   }
 
-  // Fallback markdown parsing
-  if (!image && description) {
-    const match = description.match(/!\[.*?\]\((.*?)\)/);
-    if (match && match[1]) {
-      image = match[1];
-      description = description.replace(match[0], '').trim();
-    }
+  // Final Validation based on Expectation
+  if (expectedType === 'image' && !image) {
+    throw new Error("API 返回数据为空，未生成图片。");
   }
-
-  if (!image) throw new Error("API 返回数据为空，未生成图片。");
 
   return {
     image,
-    description: description.replace(/^#+\s*设计理念.*?\n/, '').replace(/^\*\*设计理念.*?\*\*/, '').trim() || "生成成功"
+    description: description.replace(/^#+\s*设计理念.*?\n/, '').replace(/^\*\*设计理念.*?\*\*/, '').trim()
   };
 }
 
