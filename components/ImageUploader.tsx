@@ -77,7 +77,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageSelected, compact 
         hover:border-champagne-400 hover:bg-white transition-all duration-500 
         group relative flex flex-col items-center justify-center rounded-xl
         shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)] hover:shadow-soft
-        min-h-[250px] md:min-h-0
+        min-h-[200px] md:min-h-0
       `}
       onDrop={handleDrop}
       onDragOver={handleDragOver}

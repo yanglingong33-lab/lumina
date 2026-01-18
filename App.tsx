@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { DesignConfig, MetalType, GemstoneType, JewelryType, ViewAngle, ImageSize, AspectRatio, AppState, DesignHistoryItem, AppSettings, VariationMode, VariationItem } from './types';
 import { generateJewelryDesign, generateJewelryVariation, generateDesignConcept } from './services/geminiService';
@@ -341,7 +340,7 @@ function App() {
 
   return (
     <div className="h-[100dvh] w-full bg-stone-50 text-stone-800 flex flex-col font-sans overflow-hidden">
-      {/* Header - Changed to Sticky to prevent content overlap */}
+      {/* Header - Sticky */}
       <header className="flex-none h-14 md:h-20 sticky top-0 z-40 flex items-center justify-between px-4 md:px-10 bg-white/90 backdrop-blur-md border-b border-stone-100 shadow-sm">
         <div className="flex items-center gap-2 md:gap-3">
           <div className="text-champagne-400 p-1.5 rounded-full bg-stone-50 border border-stone-200"><Gem className="w-5 h-5 md:w-6 md:h-6" /></div>
@@ -365,29 +364,31 @@ function App() {
         {/* Left Panel: Visual Workspace */}
         <div className={`
           relative transition-all duration-700 w-full md:flex-1 bg-stone-50 
-          ${originalImage ? 'h-[40vh] md:h-auto shrink-0 border-b md:border-b-0 md:border-r border-stone-100' : 'h-full'} 
+          ${originalImage ? 'h-[50vh] md:h-auto shrink-0 border-b md:border-b-0 md:border-r border-stone-100' : 'h-full'} 
           flex flex-col z-10
         `}>
           <div className="relative w-full h-full p-2 md:p-8 flex flex-col items-center justify-center overflow-hidden">
             {!originalImage ? (
               <div className="w-full h-full flex flex-col">
-                {/* Input Mode Toggle */}
-                <div className="flex-none flex justify-center pb-4 z-20">
-                   <div className="flex bg-white/80 backdrop-blur rounded-full p-1 border border-stone-200 shadow-sm">
-                      <button 
-                        onClick={() => setInputMode('upload')}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all ${inputMode === 'upload' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-500 hover:text-stone-800'}`}
-                      >
-                         <ImageIcon className="w-3.5 h-3.5" /> 上传照片
-                      </button>
-                      <button 
-                        onClick={() => setInputMode('canvas')}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all ${inputMode === 'canvas' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-500 hover:text-stone-800'}`}
-                      >
-                         <PenTool className="w-3.5 h-3.5" /> 手绘草图
-                      </button>
-                   </div>
-                </div>
+                {/* Input Mode Toggle - Only show if not in canvas mode to save space */}
+                {inputMode === 'upload' && (
+                  <div className="flex-none flex justify-center pb-4 z-20">
+                     <div className="flex bg-white/80 backdrop-blur rounded-full p-1 border border-stone-200 shadow-sm">
+                        <button 
+                          onClick={() => setInputMode('upload')}
+                          className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all ${inputMode === 'upload' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-500 hover:text-stone-800'}`}
+                        >
+                           <ImageIcon className="w-3.5 h-3.5" /> 上传照片
+                        </button>
+                        <button 
+                          onClick={() => setInputMode('canvas')}
+                          className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all ${inputMode === 'canvas' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-500 hover:text-stone-800'}`}
+                        >
+                           <PenTool className="w-3.5 h-3.5" /> 手绘草图
+                        </button>
+                     </div>
+                  </div>
+                )}
 
                 {/* Content Area */}
                 <div className="flex-1 min-h-0 w-full max-w-4xl mx-auto rounded-2xl overflow-hidden shadow-soft border border-stone-100 bg-white animate-fade-in-up">

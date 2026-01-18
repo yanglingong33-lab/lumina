@@ -74,13 +74,26 @@ export const generateJewelryDesign = async (
   const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
   const cleanBase64 = base64Image.replace(/^data:image\/[a-zA-Z+]+;base64,/, '');
 
+  // Smart Prompt Construction
+  const isSmartMetal = config.metal.includes('智能') || config.metal.includes('自定义');
+  const metalPrompt = isSmartMetal ? 'luxurious precious metal fitting the style' : config.metal;
+
+  let gemstonePrompt = "";
+  if (config.gemstone === '无主石') {
+    gemstonePrompt = "focusing on pure sculptural metalwork, no main gemstone";
+  } else if (config.gemstone.includes('智能') || config.gemstone.includes('自定义')) {
+    gemstonePrompt = "featuring high-grade precious gemstones that complement the design";
+  } else {
+    gemstonePrompt = `featuring high-grade ${config.gemstone}`;
+  }
+
   // Revised Prompt for Maximum Realism - IMAGE FOCUSED
   const prompt = `
     Role: Senior Haute Joaillerie Designer & Luxury Product Photographer.
     Task: Re-imagine the item in the image as a museum-grade luxury jewelry piece.
     
     PHOTOREALISTIC VISUALIZATION SPECS:
-    - Subject: A single ${config.type} made of polished ${config.metal}, featuring high-grade ${config.gemstone} and ${config.auxiliaryStone || 'refined detailing'}.
+    - Subject: A single ${config.type} made of polished ${metalPrompt}, ${gemstonePrompt}, and ${config.auxiliaryStone || 'refined detailing'}.
     - Perspective: ${config.viewAngle}.
     - Lighting: Professional studio softbox lighting.
     - Style: ${config.description || 'Modern Elegance'}.

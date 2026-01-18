@@ -1,5 +1,6 @@
 
 export enum MetalType {
+  Any = '自定义/智能搭配',
   YellowGold18K = '18K 黄金',
   WhiteGold18K = '18K 白金',
   RoseGold18K = '18K 玫瑰金',
@@ -13,6 +14,7 @@ export enum MetalType {
 }
 
 export enum GemstoneType {
+  Any = '自定义/智能搭配',
   Diamond = '钻石',
   Moissanite = '莫桑钻',
   Ruby = '红宝石',
