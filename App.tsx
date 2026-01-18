@@ -6,7 +6,7 @@ import ComparisonSlider from './components/ComparisonSlider';
 import ConfigPanel from './components/ConfigPanel';
 import ImageUploader from './components/ImageUploader';
 import HistoryDrawer from './components/HistoryDrawer';
-import { Gem, Download, Trash2, Loader2, Sparkles, Heart, Settings, X, Save, Wand2, Layers, User, Camera, Send, Edit, History, ArrowLeft, Feather, ChevronDown, ChevronUp } from 'lucide-react';
+import { Gem, Download, Trash2, Loader2, Sparkles, Heart, Settings, X, Save, Wand2, Layers, User, Camera, Send, Edit, History, ArrowLeft, Feather, ChevronDown, ChevronUp, PauseCircle, AlertTriangle } from 'lucide-react';
 
 const LOADING_STEPS = ["Analyzing Geometry...", "Refining Details...", "Simulating Light...", "Mastering Texture..."];
 
@@ -19,6 +19,10 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [loadingStepIndex, setLoadingStepIndex] = useState(0);
   
+  // Task Control
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const [showStopWarning, setShowStopWarning] = useState(false);
+
   // Settings
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settings, setSettings] = useState<AppSettings>({ apiKey: '', baseUrl: '', modelName: '' });
@@ -114,23 +118,47 @@ function App() {
     setCurrentDesignId(newItem.id);
   };
 
+  // --- Task Control Handlers ---
+
+  const handleStopRequest = () => {
+    setShowStopWarning(true);
+  };
+
+  const confirmStopTask = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    setIsGenerating(false);
+    setShowStopWarning(false);
+    // Don't modify image state, just leave it as is (or keep previous result)
+  };
+
+  const cancelStopTask = () => {
+    setShowStopWarning(false);
+  };
+
   const handleGenerate = async () => {
     if (!originalImage) return;
     if (!settings.apiKey && !process.env.API_KEY) { setIsSettingsOpen(true); setError("请先配置 API Key"); return; }
     
+    // Reset Abort Controller
+    abortControllerRef.current = new AbortController();
+
     setIsGenerating(true);
     setError(null);
     setAppState('GENERATING');
     setGeneratedDescription(null);
     setIsSaved(false);
     setCurrentDesignId(null);
-    // Note: variations clearing happens below inside success flow or we can do it here
     setVariations([]); 
     setShowDescription(true);
 
     try {
       // Step 1: Generate Image
+      // Note: We are not passing signal to service yet, but we check logic after await
       const imageResult = await generateJewelryDesign(originalImage, config);
+      if (abortControllerRef.current?.signal.aborted) return;
+
       setGeneratedImage(imageResult.image);
       setGeneratedDescription("正在撰写设计理念..."); // Placeholder
       setAppState('RESULT'); // Show result immediately
@@ -147,6 +175,8 @@ function App() {
 
       // Step 2: Generate Concept Text (using original image as context)
       const conceptText = await generateDesignConcept(originalImage, config);
+      if (abortControllerRef.current?.signal.aborted) return;
+
       setGeneratedDescription(conceptText);
       
       // Update the base item with the actual description
@@ -156,11 +186,14 @@ function App() {
       addToRecentHistory(imageResult.image, conceptText);
 
     } catch (err: any) {
+      if (abortControllerRef.current?.signal.aborted) return;
       setError(err.message.includes("AUTH_ERROR") ? err.message.replace("AUTH_ERROR: ", "") : (err.message || '生成失败'));
       if (err.message.includes("AUTH_ERROR")) setIsSettingsOpen(true);
       setAppState('CONFIGURING');
     } finally {
-      setIsGenerating(false);
+      if (!abortControllerRef.current?.signal.aborted) {
+        setIsGenerating(false);
+      }
     }
   };
 
@@ -170,11 +203,15 @@ function App() {
     if (!generatedImage) return;
     if (mode === VariationMode.REFINE && !refineText.trim()) return;
 
+    // Reset Abort Controller
+    abortControllerRef.current = new AbortController();
+
     setIsGenerating(true);
     setError(null);
 
     try {
       const result = await generateJewelryVariation(generatedImage, mode, refineText);
+      if (abortControllerRef.current?.signal.aborted) return;
       
       const newVariation: VariationItem = {
         id: Date.now().toString(),
@@ -196,9 +233,12 @@ function App() {
       }
 
     } catch (err: any) {
+      if (abortControllerRef.current?.signal.aborted) return;
       setError("变体生成失败: " + err.message);
     } finally {
-      setIsGenerating(false);
+      if (!abortControllerRef.current?.signal.aborted) {
+        setIsGenerating(false);
+      }
     }
   };
 
@@ -343,13 +383,22 @@ function App() {
                       </>
                     )}
 
+                    {/* Generating Overlay with Stop Button */}
                     {isGenerating && (
-                      <div className="absolute inset-0 bg-stone-50/90 backdrop-blur-sm z-50 flex flex-col items-center justify-center">
-                        <div className="relative mb-4 md:mb-6">
+                      <div className="absolute inset-0 bg-stone-50/90 backdrop-blur-sm z-50 flex flex-col items-center justify-center animate-fade-in">
+                        <div className="relative mb-6">
                            <div className="w-16 h-16 md:w-20 md:h-20 rounded-full border border-stone-200 border-t-champagne-400 animate-spin"></div>
                            <Gem className="absolute inset-0 m-auto w-6 h-6 md:w-8 md:h-8 text-champagne-500 animate-pulse" />
                         </div>
-                        <span className="font-serif text-sm md:text-lg text-stone-800 animate-pulse">{LOADING_STEPS[loadingStepIndex]}</span>
+                        <span className="font-serif text-sm md:text-lg text-stone-800 animate-pulse mb-8">{LOADING_STEPS[loadingStepIndex]}</span>
+                        
+                        <button 
+                          onClick={handleStopRequest}
+                          className="flex items-center gap-2 px-5 py-2 rounded-full border border-stone-200 bg-white hover:bg-stone-50 text-stone-500 hover:text-red-500 transition-all shadow-sm text-xs font-bold uppercase tracking-widest group"
+                        >
+                          <PauseCircle className="w-4 h-4 group-hover:text-red-500" />
+                          停止生成
+                        </button>
                       </div>
                     )}
 
@@ -398,7 +447,7 @@ function App() {
         `}>
           
           <div className="flex-1 overflow-y-auto custom-scrollbar relative">
-            {appState === 'RESULT' && !isGenerating ? (
+            {appState === 'RESULT' ? (
                /* Creative Studio Mode */
                <div className="p-5 md:p-6 space-y-6 md:space-y-8 animate-fade-in-up pb-24 md:pb-6">
                   <div className="space-y-1 md:space-y-2">
@@ -465,16 +514,17 @@ function App() {
                              type="text" 
                              value={refineText}
                              onChange={(e) => setRefineText(e.target.value)}
-                             onKeyDown={(e) => e.key === 'Enter' && handleVariation(VariationMode.REFINE)}
+                             onKeyDown={(e) => e.key === 'Enter' && !isGenerating && handleVariation(VariationMode.REFINE)}
+                             disabled={isGenerating}
                              placeholder="例如：改为玫瑰金..."
-                             className="w-full bg-stone-50 border border-stone-200 rounded-xl pl-4 pr-10 py-3 text-sm focus:border-champagne-400 outline-none"
+                             className="w-full bg-stone-50 border border-stone-200 rounded-xl pl-4 pr-10 py-3 text-sm focus:border-champagne-400 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                            />
                            <Edit className="absolute right-3 top-3 w-4 h-4 text-stone-400" />
                         </div>
                         <button 
                           onClick={() => handleVariation(VariationMode.REFINE)}
-                          disabled={!refineText.trim()}
-                          className="bg-stone-900 text-white p-3 rounded-xl disabled:opacity-50 hover:bg-stone-700 flex-shrink-0"
+                          disabled={!refineText.trim() || isGenerating}
+                          className="bg-stone-900 text-white p-3 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed hover:bg-stone-700 flex-shrink-0 transition-all"
                         >
                           <Send className="w-4 h-4" />
                         </button>
@@ -484,26 +534,48 @@ function App() {
                   <div className="space-y-3">
                      <label className="text-[10px] font-bold uppercase tracking-widest text-stone-400">一键生成 (Quick Gen)</label>
                      <div className="grid grid-cols-3 gap-2 md:gap-3">
-                        <button onClick={() => handleVariation(VariationMode.VIEWS)} className="flex flex-col items-center justify-center gap-2 p-3 md:p-4 rounded-xl border border-stone-100 bg-stone-50 hover:border-champagne-400 hover:bg-white transition-all group">
-                           <Layers className="w-5 h-5 md:w-6 md:h-6 text-stone-400 group-hover:text-champagne-500" />
+                        <button 
+                            onClick={() => handleVariation(VariationMode.VIEWS)} 
+                            disabled={isGenerating}
+                            className="flex flex-col items-center justify-center gap-2 p-3 md:p-4 rounded-xl border border-stone-100 bg-stone-50 hover:border-champagne-400 hover:bg-white transition-all group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-stone-50 disabled:hover:border-stone-100"
+                        >
+                           <Layers className="w-5 h-5 md:w-6 md:h-6 text-stone-400 group-hover:text-champagne-500 disabled:group-hover:text-stone-400" />
                            <span className="text-[10px] font-bold text-stone-600">三视图</span>
                         </button>
-                        <button onClick={() => handleVariation(VariationMode.MODEL)} className="flex flex-col items-center justify-center gap-2 p-3 md:p-4 rounded-xl border border-stone-100 bg-stone-50 hover:border-champagne-400 hover:bg-white transition-all group">
-                           <User className="w-5 h-5 md:w-6 md:h-6 text-stone-400 group-hover:text-champagne-500" />
+                        <button 
+                            onClick={() => handleVariation(VariationMode.MODEL)} 
+                            disabled={isGenerating}
+                            className="flex flex-col items-center justify-center gap-2 p-3 md:p-4 rounded-xl border border-stone-100 bg-stone-50 hover:border-champagne-400 hover:bg-white transition-all group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-stone-50 disabled:hover:border-stone-100"
+                        >
+                           <User className="w-5 h-5 md:w-6 md:h-6 text-stone-400 group-hover:text-champagne-500 disabled:group-hover:text-stone-400" />
                            <span className="text-[10px] font-bold text-stone-600">模特试戴</span>
                         </button>
-                        <button onClick={() => handleVariation(VariationMode.PHOTO)} className="flex flex-col items-center justify-center gap-2 p-3 md:p-4 rounded-xl border border-stone-100 bg-stone-50 hover:border-champagne-400 hover:bg-white transition-all group">
-                           <Camera className="w-5 h-5 md:w-6 md:h-6 text-stone-400 group-hover:text-champagne-500" />
+                        <button 
+                            onClick={() => handleVariation(VariationMode.PHOTO)} 
+                            disabled={isGenerating}
+                            className="flex flex-col items-center justify-center gap-2 p-3 md:p-4 rounded-xl border border-stone-100 bg-stone-50 hover:border-champagne-400 hover:bg-white transition-all group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-stone-50 disabled:hover:border-stone-100"
+                        >
+                           <Camera className="w-5 h-5 md:w-6 md:h-6 text-stone-400 group-hover:text-champagne-500 disabled:group-hover:text-stone-400" />
                            <span className="text-[10px] font-bold text-stone-600">摄影大片</span>
                         </button>
                      </div>
                   </div>
 
                   <div className="pt-4 border-t border-stone-100 flex flex-col gap-3">
-                     <button onClick={() => handleToggleFavorite()} className={`w-full py-3 rounded-xl border font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${isSaved ? 'bg-red-50 border-red-200 text-red-500' : 'border-stone-200 text-stone-600 hover:border-stone-400'}`}>
+                     <button 
+                        onClick={() => handleToggleFavorite()} 
+                        disabled={isGenerating}
+                        className={`w-full py-3 rounded-xl border font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${isSaved ? 'bg-red-50 border-red-200 text-red-500' : 'border-stone-200 text-stone-600 hover:border-stone-400'} disabled:opacity-50 disabled:cursor-not-allowed`}
+                     >
                         <Heart className={`w-4 h-4 ${isSaved ? 'fill-current' : ''}`} /> {isSaved ? '已收藏' : '收藏设计'}
                      </button>
-                     <button onClick={() => setAppState('CONFIGURING')} className="w-full py-3 text-stone-400 text-xs hover:text-stone-600">返回参数配置</button>
+                     <button 
+                        onClick={() => setAppState('CONFIGURING')} 
+                        disabled={isGenerating}
+                        className="w-full py-3 text-stone-400 text-xs hover:text-stone-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                     >
+                        返回参数配置
+                     </button>
                   </div>
                </div>
             ) : (
@@ -568,6 +640,37 @@ function App() {
                 <button onClick={handleSaveSettings} className="w-full bg-stone-900 text-white py-3 rounded-lg font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2"><Save className="w-4 h-4" /> Save Configuration</button>
              </div>
           </div>
+        </div>
+      )}
+
+      {/* Stop Warning Modal */}
+      {showStopWarning && (
+        <div className="fixed inset-0 bg-stone-900/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-scale-in">
+              <div className="p-6 text-center space-y-4">
+                 <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center mx-auto">
+                    <AlertTriangle className="w-6 h-6 text-red-500" />
+                 </div>
+                 <h3 className="text-lg font-serif font-bold text-stone-900">确认停止生成？</h3>
+                 <p className="text-sm text-stone-600 leading-relaxed">
+                    停止当前任务将无法获得结果，但系统<span className="font-bold text-red-500">依然会扣除</span>本次生成的算力费用。
+                 </p>
+                 <div className="flex gap-3 pt-2">
+                    <button 
+                       onClick={cancelStopTask}
+                       className="flex-1 py-3 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-xl text-xs font-bold uppercase tracking-wider"
+                    >
+                       继续生成
+                    </button>
+                    <button 
+                       onClick={confirmStopTask}
+                       className="flex-1 py-3 bg-red-500 hover:bg-red-600 text-white rounded-xl text-xs font-bold uppercase tracking-wider"
+                    >
+                       确认停止
+                    </button>
+                 </div>
+              </div>
+           </div>
         </div>
       )}
       
