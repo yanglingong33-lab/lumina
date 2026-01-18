@@ -234,13 +234,13 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ config, setConfig, onGenerate
              <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-in-out bg-gradient-to-r from-transparent via-white/10 to-transparent skew-x-12 z-10"></div>
           )}
 
-          {/* 4. Generating State: Pulse & Flow */}
+          {/* 4. Generating State: Smooth Flow & Gradient */}
           {isGenerating && (
-             <div className="absolute inset-0 z-0">
-               {/* Deep animated background */}
-               <div className="absolute inset-0 bg-stone-800 animate-pulse"></div>
-               {/* Moving Light Beam */}
-               <div className="absolute inset-0 bg-[linear-gradient(90deg,transparent,rgba(212,175,55,0.2),transparent)] bg-[length:50%_100%] animate-[shimmer_1.5s_infinite]"></div>
+             <div className="absolute inset-0 z-0 overflow-hidden">
+               {/* Base Dark Background */}
+               <div className="absolute inset-0 bg-stone-800"></div>
+               {/* Moving Gradient Sheen - Smoother than pulse */}
+               <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(0,0,0,0),rgba(212,175,55,0.15),rgba(0,0,0,0))] bg-[length:200%_100%] animate-flow"></div>
              </div>
           )}
 
@@ -252,7 +252,7 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ config, setConfig, onGenerate
                   <Loader2 className="w-5 h-5 text-champagne-400 animate-spin" />
                   <div className="absolute inset-0 bg-champagne-400/30 blur-md animate-pulse"></div>
                 </div>
-                <span className="text-xs font-bold tracking-[0.25em] uppercase text-champagne-100">Crafting Masterpiece...</span>
+                <span className="text-xs font-bold tracking-[0.25em] uppercase text-champagne-100">Crafting...</span>
               </>
             ) : (
               <>

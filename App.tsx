@@ -391,21 +391,46 @@ function App() {
                       </>
                     )}
 
-                    {/* Generating Overlay with Stop Button */}
+                    {/* REFINED LOADING OVERLAY */}
                     {isGenerating && (
-                      <div className="absolute inset-0 bg-stone-50/90 backdrop-blur-sm z-50 flex flex-col items-center justify-center animate-fade-in">
-                        <div className="relative mb-6">
-                           <div className="w-16 h-16 md:w-20 md:h-20 rounded-full border border-stone-200 border-t-champagne-400 animate-spin"></div>
-                           <Gem className="absolute inset-0 m-auto w-6 h-6 md:w-8 md:h-8 text-champagne-500 animate-pulse" />
+                      <div className="absolute inset-0 bg-white/85 backdrop-blur-md z-50 flex flex-col items-center justify-center animate-fade-in transition-all duration-500">
+                        <div className="relative mb-10 p-10 animate-float">
+                          {/* Ambient Glow */}
+                          <div className="absolute inset-0 bg-champagne-400/20 blur-[60px] rounded-full animate-pulse-slow"></div>
+                          
+                          {/* Outer Elegant Ring */}
+                          <div className="absolute inset-0 rounded-full border border-stone-100/50"></div>
+                          <div className="absolute inset-0 rounded-full border border-t-champagne-300/50 border-r-transparent border-b-transparent border-l-transparent animate-spin-slow"></div>
+                          
+                          {/* Inner Counter-Rotating Ring */}
+                          <div className="absolute inset-3 rounded-full border border-b-champagne-500/80 border-t-transparent border-r-transparent border-l-transparent animate-spin-reverse-slower"></div>
+
+                          {/* Central Pulsing Gem */}
+                          <div className="relative z-10 flex items-center justify-center w-full h-full">
+                            <Gem className="w-10 h-10 md:w-12 md:h-12 text-champagne-500 drop-shadow-[0_4px_10px_rgba(212,175,55,0.4)] animate-pulse-gold" strokeWidth={1} />
+                          </div>
                         </div>
-                        <span className="font-serif text-sm md:text-lg text-stone-800 animate-pulse mb-8">{LOADING_STEPS[loadingStepIndex]}</span>
+                        
+                        <div className="flex flex-col items-center gap-4 relative z-10 h-20">
+                          <span 
+                            key={loadingStepIndex} 
+                            className="font-serif text-lg md:text-xl text-stone-800 tracking-wide animate-fade-in-up"
+                          >
+                            {LOADING_STEPS[loadingStepIndex]}
+                          </span>
+                          
+                          {/* Indeterminate Progress Line */}
+                          <div className="w-40 md:w-56 h-[2px] bg-stone-100 rounded-full overflow-hidden relative">
+                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-champagne-500 to-transparent w-1/2 animate-[shimmer_1.5s_infinite]"></div>
+                          </div>
+                        </div>
                         
                         <button 
                           onClick={handleStopRequest}
-                          className="flex items-center gap-2 px-5 py-2 rounded-full border border-stone-200 bg-white hover:bg-stone-50 text-stone-500 hover:text-red-500 transition-all shadow-sm text-xs font-bold uppercase tracking-widest group"
+                          className="mt-6 flex items-center gap-2 px-6 py-2.5 rounded-full border border-stone-200 bg-white/80 hover:bg-stone-50 text-stone-400 hover:text-red-500 transition-all shadow-sm text-[10px] font-bold uppercase tracking-widest group opacity-0 animate-fade-in delay-700 fill-mode-forwards"
                         >
-                          <PauseCircle className="w-4 h-4 group-hover:text-red-500" />
-                          停止生成
+                          <PauseCircle className="w-4 h-4 group-hover:text-red-500 transition-colors" />
+                          Stop Generation
                         </button>
                       </div>
                     )}
