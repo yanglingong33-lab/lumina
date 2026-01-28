@@ -55,9 +55,35 @@ function App() {
   const variationsEndRef = useRef<HTMLDivElement>(null);
   const [showDescription, setShowDescription] = useState(true);
 
-  // Persist State
-  useEffect(() => { localStorage.setItem('lumina_collection', JSON.stringify(savedCollection)); }, [savedCollection]);
-  useEffect(() => { localStorage.setItem('lumina_history', JSON.stringify(recentHistory)); }, [recentHistory]);
+  // Persist State with Quota Handling
+  useEffect(() => {
+    try {
+      localStorage.setItem('lumina_collection', JSON.stringify(savedCollection));
+    } catch (e) {
+      console.warn("Failed to save collection to storage:", e);
+    }
+  }, [savedCollection]);
+
+  useEffect(() => {
+    const saveHistorySafe = (items: DesignHistoryItem[]) => {
+      try {
+        localStorage.setItem('lumina_history', JSON.stringify(items));
+      } catch (e: any) {
+        // Handle QuotaExceededError
+        if (e.name === 'QuotaExceededError' || e.code === 22 || e.code === 1014) {
+          if (items.length > 0) {
+            // Recursively try to save with one less item (remove oldest/last)
+            // recentHistory is ordered newest first, so slice(0, -1) removes oldest
+            saveHistorySafe(items.slice(0, -1));
+          } else {
+             console.warn("Storage full, clearing history");
+             localStorage.removeItem('lumina_history');
+          }
+        }
+      }
+    };
+    saveHistorySafe(recentHistory);
+  }, [recentHistory]);
 
   useEffect(() => {
     let interval: any;
