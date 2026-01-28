@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { DesignConfig, MetalType, GemstoneType, JewelryType, ViewAngle, ImageSize, AspectRatio, AppState, DesignHistoryItem, AppSettings, VariationMode, VariationItem } from './types';
 import { generateJewelryDesign, generateJewelryVariation, generateDesignConcept } from './services/geminiService';
+import { getItem, setItem } from './services/storageService';
 import ComparisonSlider from './components/ComparisonSlider';
 import ConfigPanel from './components/ConfigPanel';
 import ImageUploader from './components/ImageUploader';
@@ -34,15 +35,10 @@ function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settings, setSettings] = useState<AppSettings>({ apiKey: '', baseUrl: '', modelName: '' });
 
-  // Saved Collection (Manual)
-  const [savedCollection, setSavedCollection] = useState<DesignHistoryItem[]>(() => {
-    try { const s = localStorage.getItem('lumina_collection'); return s ? JSON.parse(s) : []; } catch { return []; }
-  });
-
-  // Recent History (Automatic, max 10)
-  const [recentHistory, setRecentHistory] = useState<DesignHistoryItem[]>(() => {
-    try { const s = localStorage.getItem('lumina_history'); return s ? JSON.parse(s) : []; } catch { return []; }
-  });
+  // Data State - Initialize empty, load async
+  const [savedCollection, setSavedCollection] = useState<DesignHistoryItem[]>([]);
+  const [recentHistory, setRecentHistory] = useState<DesignHistoryItem[]>([]);
+  const [isStorageReady, setIsStorageReady] = useState(false);
 
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
@@ -55,35 +51,72 @@ function App() {
   const variationsEndRef = useRef<HTMLDivElement>(null);
   const [showDescription, setShowDescription] = useState(true);
 
-  // Persist State with Quota Handling
+  // --- Storage Initialization & Migration ---
   useEffect(() => {
-    try {
-      localStorage.setItem('lumina_collection', JSON.stringify(savedCollection));
-    } catch (e) {
-      console.warn("Failed to save collection to storage:", e);
-    }
-  }, [savedCollection]);
-
-  useEffect(() => {
-    const saveHistorySafe = (items: DesignHistoryItem[]) => {
+    const initStorage = async () => {
       try {
-        localStorage.setItem('lumina_history', JSON.stringify(items));
-      } catch (e: any) {
-        // Handle QuotaExceededError
-        if (e.name === 'QuotaExceededError' || e.code === 22 || e.code === 1014) {
-          if (items.length > 0) {
-            // Recursively try to save with one less item (remove oldest/last)
-            // recentHistory is ordered newest first, so slice(0, -1) removes oldest
-            saveHistorySafe(items.slice(0, -1));
-          } else {
-             console.warn("Storage full, clearing history");
-             localStorage.removeItem('lumina_history');
-          }
+        // 1. Try to get data from IndexedDB
+        const dbSaved = await getItem<DesignHistoryItem[]>('lumina_collection');
+        const dbHistory = await getItem<DesignHistoryItem[]>('lumina_history');
+
+        let initialSaved = dbSaved || [];
+        let initialHistory = dbHistory || [];
+
+        // 2. Migration: If IndexedDB is empty, check LocalStorage (Backwards Compatibility)
+        if (!dbSaved && !dbHistory) {
+           try {
+              const lsSaved = localStorage.getItem('lumina_collection');
+              const lsHistory = localStorage.getItem('lumina_history');
+              
+              if (lsSaved) {
+                 const parsedSaved = JSON.parse(lsSaved);
+                 if (Array.isArray(parsedSaved)) {
+                   initialSaved = parsedSaved;
+                   await setItem('lumina_collection', initialSaved);
+                 }
+              }
+              if (lsHistory) {
+                 const parsedHistory = JSON.parse(lsHistory);
+                 if (Array.isArray(parsedHistory)) {
+                    initialHistory = parsedHistory;
+                    await setItem('lumina_history', initialHistory);
+                 }
+              }
+
+              // 3. Cleanup LocalStorage to fix QuotaExceededError
+              if (lsSaved || lsHistory) {
+                console.log("Migrated data from localStorage to IndexedDB");
+                localStorage.removeItem('lumina_collection');
+                localStorage.removeItem('lumina_history');
+              }
+           } catch(e) { 
+             console.warn("Migration from localStorage failed", e); 
+           }
         }
+        
+        setSavedCollection(initialSaved);
+        setRecentHistory(initialHistory);
+      } catch (err) {
+        console.error("Storage init failed", err);
+      } finally {
+        setIsStorageReady(true);
       }
     };
-    saveHistorySafe(recentHistory);
-  }, [recentHistory]);
+    initStorage();
+  }, []);
+
+  // --- Persist State to IndexedDB ---
+  useEffect(() => {
+    if (isStorageReady) {
+      setItem('lumina_collection', savedCollection).catch(e => console.error("Failed to save collection", e));
+    }
+  }, [savedCollection, isStorageReady]);
+
+  useEffect(() => {
+    if (isStorageReady) {
+      setItem('lumina_history', recentHistory).catch(e => console.error("Failed to save history", e));
+    }
+  }, [recentHistory, isStorageReady]);
 
   useEffect(() => {
     let interval: any;
