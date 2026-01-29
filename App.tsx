@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { DesignConfig, MetalType, GemstoneType, JewelryType, ViewAngle, ImageSize, AspectRatio, AppState, DesignHistoryItem, AppSettings, VariationMode, VariationItem } from './types';
-import { generateJewelryDesign, generateJewelryVariation, generateDesignConcept } from './services/geminiService';
+import { DesignConfig, MetalType, GemstoneType, JewelryType, ViewAngle, ImageSize, AspectRatio, AppState, DesignHistoryItem, AppSettings, VariationMode, VariationItem, ProductionSpecs } from './types';
+import { generateJewelryDesign, generateJewelryVariation, generateDesignConcept, generateProductionSpecs } from './services/geminiService';
 import { getItem, setItem } from './services/storageService';
 import ComparisonSlider from './components/ComparisonSlider';
 import ConfigPanel from './components/ConfigPanel';
 import ImageUploader from './components/ImageUploader';
 import CreativeCanvas from './components/CreativeCanvas';
 import HistoryDrawer from './components/HistoryDrawer';
-import { Gem, Download, Trash2, Loader2, Sparkles, Heart, Settings, X, Save, Wand2, Layers, User, Camera, Send, Edit, History, ArrowLeft, Feather, ChevronDown, ChevronUp, PauseCircle, AlertTriangle, Maximize2, Eye, PenTool, Image as ImageIcon } from 'lucide-react';
+import ProductionSheet from './components/ProductionSheet';
+import { Gem, Download, Trash2, Loader2, Sparkles, Heart, Settings, X, Save, Wand2, Layers, User, Camera, Send, Edit, History, ArrowLeft, Feather, ChevronDown, ChevronUp, PauseCircle, AlertTriangle, Maximize2, Eye, PenTool, Image as ImageIcon, ClipboardList } from 'lucide-react';
 
 const LOADING_STEPS = ["Analyzing Geometry...", "Refining Details...", "Simulating Light...", "Mastering Texture..."];
 
@@ -50,6 +51,11 @@ function App() {
   const [refineText, setRefineText] = useState("");
   const variationsEndRef = useRef<HTMLDivElement>(null);
   const [showDescription, setShowDescription] = useState(true);
+
+  // Production Specs State
+  const [productionSpecs, setProductionSpecs] = useState<ProductionSpecs | null>(null);
+  const [showProductionSheet, setShowProductionSheet] = useState(false);
+  const [isGeneratingSpecs, setIsGeneratingSpecs] = useState(false);
 
   // --- Storage Initialization & Migration ---
   useEffect(() => {
@@ -161,9 +167,10 @@ function App() {
     setCurrentDesignId(null);
     setVariations([]); // Clear variations on new image
     setShowDescription(true);
+    setProductionSpecs(null); // Reset specs
   };
 
-  const addToRecentHistory = (resultImage: string, resultDesc: string) => {
+  const addToRecentHistory = (resultImage: string, resultDesc: string, specs?: ProductionSpecs) => {
     if (!originalImage) return;
     const newItem: DesignHistoryItem = {
       id: Date.now().toString(),
@@ -171,7 +178,8 @@ function App() {
       originalImage,
       generatedImage: resultImage,
       designDescription: resultDesc,
-      config: { ...config }
+      config: { ...config },
+      productionSpecs: specs
     };
 
     setRecentHistory(prev => {
@@ -218,6 +226,7 @@ function App() {
     setCurrentDesignId(null);
     setVariations([]); 
     setShowDescription(true);
+    setProductionSpecs(null);
 
     try {
       // Step 1: Generate Image
@@ -308,6 +317,27 @@ function App() {
     }
   };
 
+  const handleGenerateSpecs = async () => {
+    if (!generatedImage) return;
+    setIsGeneratingSpecs(true);
+    try {
+      const specs = await generateProductionSpecs(generatedImage, config);
+      setProductionSpecs(specs);
+      setShowProductionSheet(true);
+      
+      // Update history with specs if current item is in history
+      if (currentDesignId) {
+        setRecentHistory(prev => prev.map(item => 
+          item.id === currentDesignId ? { ...item, productionSpecs: specs } : item
+        ));
+      }
+    } catch (err: any) {
+      setError("工单生成失败: " + err.message);
+    } finally {
+      setIsGeneratingSpecs(false);
+    }
+  };
+
   const handleSelectVariation = (item: VariationItem) => {
     setGeneratedImage(item.image);
     setGeneratedDescription(item.description);
@@ -337,7 +367,8 @@ function App() {
             originalImage, 
             generatedImage, 
             designDescription: generatedDescription || undefined, 
-            config: { ...config } 
+            config: { ...config },
+            productionSpecs: productionSpecs || undefined
          };
          setSavedCollection(prev => [newItem, ...prev]);
          setIsSaved(true);
@@ -378,6 +409,7 @@ function App() {
     setAppState('RESULT');
     setIsHistoryOpen(false);
     setCurrentDesignId(item.id);
+    setProductionSpecs(item.productionSpecs || null);
     setVariations([{
       id: item.id,
       mode: VariationMode.ORIGINAL,
@@ -591,6 +623,28 @@ function App() {
                         ))}
                      </div>
                   </div>
+                  
+                  {/* Production Specs Button - Newly Added */}
+                  <div className="pt-2">
+                     <button 
+                        onClick={() => productionSpecs ? setShowProductionSheet(true) : handleGenerateSpecs()} 
+                        disabled={isGenerating || isGeneratingSpecs}
+                        className={`w-full py-4 rounded-xl border-2 font-bold text-sm tracking-widest uppercase flex items-center justify-center gap-3 transition-all ${isGeneratingSpecs ? 'bg-stone-100 border-stone-200 text-stone-400' : 'border-stone-800 bg-stone-900 text-white hover:bg-stone-800 hover:shadow-lg'}`}
+                     >
+                        {isGeneratingSpecs ? (
+                          <>
+                             <Loader2 className="w-4 h-4 animate-spin" /> 工单计算中...
+                          </>
+                        ) : (
+                          <>
+                             <ClipboardList className="w-4 h-4" /> {productionSpecs ? '查看生产工单' : '生成工厂工单'}
+                          </>
+                        )}
+                     </button>
+                     <p className="text-[10px] text-center text-stone-400 mt-2">
+                        * AI 自动核算金重、宝石参数及预估成本
+                     </p>
+                  </div>
 
                   <div className="pt-4 border-t border-stone-100 flex flex-col gap-3">
                      <button onClick={() => handleToggleFavorite()} disabled={isGenerating} className={`w-full py-3 rounded-xl border font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${isSaved ? 'bg-red-50 border-red-200 text-red-500' : 'border-stone-200 text-stone-600 hover:border-stone-400'} disabled:opacity-50 disabled:cursor-not-allowed`}>
@@ -650,6 +704,15 @@ function App() {
           </div>
         </div>
       )}
+      
+      {/* Production Sheet Modal */}
+      {showProductionSheet && productionSpecs && generatedImage && (
+        <ProductionSheet 
+          specs={productionSpecs} 
+          image={generatedImage} 
+          onClose={() => setShowProductionSheet(false)} 
+        />
+      )}
 
       {/* Stop Warning Modal */}
       {showStopWarning && (
@@ -668,8 +731,8 @@ function App() {
         </div>
       )}
 
-      {/* Full Screen Image Modal */}
-      {isImageZoomed && generatedImage && (
+      {/* Full Screen Image Modal (Ensure lower z-index than Production Sheet if needed, currently 100 vs 100 might conflict if both open, but logically mutually exclusive mostly) */}
+      {isImageZoomed && generatedImage && !showProductionSheet && (
         <div className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-xl animate-fade-in flex flex-col">
           <div className="flex-none p-4 md:p-6 flex justify-between items-center text-white/80">
              <div className="flex items-center gap-3"><span className="text-xs font-bold tracking-[0.2em] uppercase text-champagne-400">Preview Mode</span></div>

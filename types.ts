@@ -89,6 +89,7 @@ export interface DesignHistoryItem {
   generatedImage: string;
   designDescription?: string;
   config: DesignConfig;
+  productionSpecs?: ProductionSpecs; // Added optional specs to history
 }
 
 export interface AppSettings {
@@ -113,4 +114,58 @@ export interface VariationItem {
   mode: VariationMode;
   image: string;
   description: string;
+}
+
+// Factory / Production Specs
+export interface ProductionSpecs {
+  orderNo: string;
+  title: string;
+  date: string;
+  
+  // Dimensions & Technical
+  measurements: {
+    size: string;       // e.g. "港度 13#"
+    dimensions: string; // e.g. "15mm x 12mm x 6mm"
+    thickness: string;  // e.g. "臂厚 1.6mm"
+  };
+
+  metal: {
+    type: string;
+    estimatedWeight: string; // e.g., "3.50g"
+    lossRate: string; // e.g., "15%"
+    densityInfo: string; // e.g. "基于18K金密度 15.5g/cm³ 测算"
+  };
+
+  gemstones: {
+    main: {
+      name: string;
+      cut: string;
+      size: string;
+      qty: string;
+      setting: string; // e.g. "四爪镶嵌"
+    };
+    side: Array<{
+      type: string;
+      size: string; // e.g. "1.2mm"
+      qty: string;
+      setting: string; // e.g. "微钉镶"
+    }>;
+  };
+
+  craftsmanship: {
+    surfaceProcess: string[]; // e.g. ["拉丝", "边缘抛光"]
+    structure: string; // e.g. "分件制作"
+    plating: string; // e.g. "咪金 + 保护层"
+  };
+
+  costEstimate: {
+    goldPriceRef: string; // e.g. "620 CNY/g"
+    materialCost: string;
+    laborCost: string;
+    stoneCostRef: string;
+    totalEstimate: string;
+    currency: string;
+  };
+
+  factoryNotes: string[]; // Specific technical warnings
 }
