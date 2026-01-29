@@ -155,18 +155,18 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ config, setConfig, onGenerate
 
       <div className="space-y-6">
         <div className="grid grid-cols-2 gap-4 md:gap-6 relative z-30">
-          <CustomSelect label={t('label.type')} value={config.type} onChange={(v) => handleChange('type', v)} options={JewelryType} delayClass="delay-[100ms]" disabled={disabled} lang={lang} />
-          <CustomSelect label={t('label.quality')} value={config.imageSize} onChange={(v) => handleChange('imageSize', v)} options={ImageSize} delayClass="delay-[125ms]" disabled={disabled} lang={lang} />
+          <CustomSelect label={t('label.type')} value={config.type} onChange={(v) => handleChange('type', v)} options={JewelryType as unknown as Record<string, string>} delayClass="delay-[100ms]" disabled={disabled} lang={lang} />
+          <CustomSelect label={t('label.quality')} value={config.imageSize} onChange={(v) => handleChange('imageSize', v)} options={ImageSize as unknown as Record<string, string>} delayClass="delay-[125ms]" disabled={disabled} lang={lang} />
         </div>
 
         <div className="grid grid-cols-2 gap-4 md:gap-6 relative z-20">
-          <CustomSelect label={t('label.metal')} value={config.metal} onChange={(v) => handleChange('metal', v)} options={MetalType} delayClass="delay-[200ms]" disabled={disabled} lang={lang} />
-          <CustomSelect label={t('label.gemstone')} value={config.gemstone} onChange={(v) => handleChange('gemstone', v)} options={GemstoneType} delayClass="delay-[250ms]" disabled={disabled} lang={lang} />
+          <CustomSelect label={t('label.metal')} value={config.metal} onChange={(v) => handleChange('metal', v)} options={MetalType as unknown as Record<string, string>} delayClass="delay-[200ms]" disabled={disabled} lang={lang} />
+          <CustomSelect label={t('label.gemstone')} value={config.gemstone} onChange={(v) => handleChange('gemstone', v)} options={GemstoneType as unknown as Record<string, string>} delayClass="delay-[250ms]" disabled={disabled} lang={lang} />
         </div>
         
         <div className="grid grid-cols-2 gap-4 md:gap-6 relative z-10">
-           <CustomSelect label={t('label.perspective')} value={config.viewAngle} onChange={(v) => handleChange('viewAngle', v)} options={ViewAngle} delayClass="delay-[150ms]" disabled={disabled} lang={lang} />
-           <CustomSelect label={t('label.aspectRatio')} value={config.aspectRatio} onChange={(v) => handleChange('aspectRatio', v)} options={AspectRatio} delayClass="delay-[175ms]" disabled={disabled} lang={lang} />
+           <CustomSelect label={t('label.perspective')} value={config.viewAngle} onChange={(v) => handleChange('viewAngle', v)} options={ViewAngle as unknown as Record<string, string>} delayClass="delay-[150ms]" disabled={disabled} lang={lang} />
+           <CustomSelect label={t('label.aspectRatio')} value={config.aspectRatio} onChange={(v) => handleChange('aspectRatio', v)} options={AspectRatio as unknown as Record<string, string>} delayClass="delay-[175ms]" disabled={disabled} lang={lang} />
         </div>
 
         <div className="space-y-3 group animate-fade-in-up opacity-0 fill-mode-forwards delay-[300ms] relative z-0">
