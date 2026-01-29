@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { ProductionSpecs } from '../types';
-import { X, Printer, Hammer, Coins, Gem, ClipboardList, AlertTriangle, Scale, Ruler } from 'lucide-react';
+import { X, Printer, Hammer, Coins, Gem, ClipboardList, AlertTriangle, Scale, Ruler, Wifi } from 'lucide-react';
 
 interface ProductionSheetProps {
   specs: ProductionSpecs;
@@ -81,15 +81,18 @@ const ProductionSheet: React.FC<ProductionSheetProps> = ({ specs, image, onClose
                </div>
 
                {/* Cost Estimation */}
-               <div className="border-2 border-stone-100 rounded-lg p-4 bg-white shadow-sm print:border-stone-300">
-                  <h4 className="font-bold text-sm border-b border-stone-100 pb-2 mb-3 flex items-center gap-2 text-stone-800">
-                    <Coins className="w-4 h-4 text-champagne-500" /> 成本核算 (工厂端)
+               <div className="border-2 border-stone-100 rounded-lg p-4 bg-white shadow-sm print:border-stone-300 relative overflow-hidden">
+                  <h4 className="font-bold text-sm border-b border-stone-100 pb-2 mb-3 flex items-center justify-between text-stone-800">
+                    <div className="flex items-center gap-2"><Coins className="w-4 h-4 text-champagne-500" /> 成本核算</div>
+                    <div className="flex items-center gap-1 text-[9px] bg-green-50 text-green-600 px-1.5 py-0.5 rounded-full border border-green-100">
+                        <Wifi className="w-3 h-3" /> 实时金价
+                    </div>
                   </h4>
                   <div className="space-y-2 text-sm">
-                     <div className="flex justify-between text-stone-500 text-xs">
-                        <span>参考金价:</span> <span>{specs.costEstimate.goldPriceRef}</span>
+                     <div className="flex justify-between items-center text-stone-500 text-xs bg-stone-50 p-1.5 rounded">
+                        <span>今日参考价:</span> <span className="font-mono font-bold text-stone-700">{specs.costEstimate.goldPriceRef}</span>
                      </div>
-                     <div className="flex justify-between text-stone-600"><span>预估金料:</span> <span className="font-mono">{specs.costEstimate.materialCost}</span></div>
+                     <div className="flex justify-between text-stone-600 pt-1"><span>预估金料:</span> <span className="font-mono">{specs.costEstimate.materialCost}</span></div>
                      <div className="flex justify-between text-stone-600"><span>基础工费:</span> <span className="font-mono">{specs.costEstimate.laborCost}</span></div>
                      <div className="flex justify-between text-stone-600"><span>配石成本:</span> <span className="font-mono">{specs.costEstimate.stoneCostRef}</span></div>
                      
@@ -98,7 +101,7 @@ const ProductionSheet: React.FC<ProductionSheetProps> = ({ specs, image, onClose
                         <span className="font-bold text-lg text-champagne-600 print:text-black">{specs.costEstimate.totalEstimate} <span className="text-xs text-stone-400">{specs.costEstimate.currency}</span></span>
                      </div>
                   </div>
-                  <p className="text-[10px] text-stone-400 mt-2 leading-relaxed bg-stone-50 p-2 rounded">* 不含主石成本。实际费用以出货实重为准。</p>
+                  <p className="text-[10px] text-stone-400 mt-2 leading-relaxed rounded">* 金价实时波动，实际结算以出货当日行情为准。</p>
                </div>
             </div>
 

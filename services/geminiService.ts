@@ -259,103 +259,83 @@ export const generateProductionSpecs = async (
   const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
   const cleanBase64 = base64Image.replace(/^data:image\/[a-zA-Z+]+;base64,/, '');
 
-  // 1. 获取当前大致金价参考 (Hardcoded fallback logic if no external API)
-  // Assuming ~620 CNY/g for 999 Gold, 18K is 75% pure + alloy cost.
-  // 18K material cost approx 480-550 range including loss.
   const dateStr = new Date().toLocaleDateString('zh-CN');
 
   const prompt = `
-    Role: 拥有20年经验的珠宝工厂生产主管 (Senior Jewelry Production Manager).
-    Task: 请根据提供的珠宝设计图，生成一份可以直接下发给起版房和执模车间的《珠宝生产工艺确认单》。
-    Language: 请使用**专业中文珠宝术语** (Professional Chinese Jewelry Terminology).
+    Role: Senior Jewelry Factory Manager (资深生产主管).
+    Task: Generate a professional "Jewelry Production Order" (生产工艺确认单).
     
-    Context Information:
-    - Item Type: ${config.type}
+    STRICT INSTRUCTION - FIXED PRICE (固定金价):
+    1.  **Gold Price**: Use a FIXED reference price of **1240 CNY/g** (User defined).
+    2.  **Do NOT** search for real-time prices.
+    
+    Calculation Logic (Cost Estimation):
+    - **Gold Price (Base)**: 1240 CNY/g.
+    - **Material Cost**: 
+        - 18K Gold = (1240 * 0.75) * 1.15 (15% Loss/Markup).
+        - Platinum = 1240 * 1.15 (Estimate).
+        - Weight: Estimate based on visual volume (18K Density ~15.5g/cm³).
+    - **Labor Cost**: 350-1500 CNY depending on complexity.
+    - **Total**: Material + Labor + Side Stones.
+
+    Input Context:
+    - Type: ${config.type}
     - Metal: ${config.metal}
     - Gemstone: ${config.gemstone}
-    
-    Instruction for Logic & Calculation (Critical):
-    1.  **尺寸估算 (Dimensions)**: 
-        -   如果是戒指，默认参考港度 13# (直径~17mm)，反推主石大小和金属臂厚 (通常女戒臂厚1.2mm-1.8mm)。
-        -   如果是吊坠/项链，根据主石比例估算整体尺寸。
-    2.  **工艺识别 (Craftsmanship)**:
-        -   仔细观察图片光影。是“镜面抛光”(High Polish)? “拉丝工艺”(Brushed)? 还是“喷砂”(Sandblasted)?
-        -   是否有“分色电镀”(Two-tone plating)?
-    3.  **镶嵌方式 (Setting)**:
-        -   识别主石是“爪镶”(Prong, 几爪?)、“包镶”(Bezel)、“卡镶”(Tension)?
-        -   识别副石是“微钉镶”(Micro-pave)、“轨道镶”(Channel) 还是“共爪镶”(Shared-prong)?
-    4.  **克重与成本核算 (Weight & Cost)**:
-        -   **克重算法**: 基于视觉体积 x 金属密度。
-            -   18K金密度 ≈ 15.5 g/cm³.
-            -   925银密度 ≈ 10.4 g/cm³.
-            -   铂金Pt950密度 ≈ 21.4 g/cm³.
-            -   示例: 一个中等款18K女戒体积约0.25-0.35cm³ -> 重约 3.5g - 5.0g.
-        -   **成本参考**: 
-            -   设当前金价参考: 足金 ~620 CNY/g.
-            -   18K金料价(含损耗)参考: ~520 CNY/g.
-            -   银料价参考: ~10 CNY/g.
-            -   工费(Labor): 简单款300-500, 复杂款(微镶) 800-2000+.
-            -   给出 "Estimated Total" = (预估金重 * 料价) + 预估工费 + (预估配石成本). 
-            -   *注: 主石价格差异极大，成本核算仅包含【金料+工费+普通配石】，不含主石成本。*
 
     Output JSON Schema (Strict):
     {
       "orderNo": "PO-${Date.now().toString().slice(-6)}",
-      "title": "简短技术命名 (如: 18K金椭圆红宝四爪女戒)",
+      "title": "简短技术命名",
       "date": "${dateStr}",
       "measurements": {
-        "size": "参考尺寸 (如: 港度13#)",
-        "dimensions": "整体长宽高 (如: 12.5 x 10.5 x 6.5 mm)",
-        "thickness": "关键壁厚 (如: 戒臂底厚1.3mm / 壁厚1.6mm)"
+        "size": "参考尺寸 (e.g., 港度13#)",
+        "dimensions": "L x W x H mm",
+        "thickness": "壁厚 mm"
       },
       "metal": {
-        "type": "具体成色 (如: AU750/18K玫瑰金)",
-        "estimatedWeight": "预估净金重范围 (如: 3.2g - 3.5g)",
-        "lossRate": "15% (标准损耗)",
-        "densityInfo": "基于18K金密度15.5g/cm³测算"
+        "type": "成色 (e.g., Au750/18K)",
+        "estimatedWeight": "预估重 (e.g., 3.5g)",
+        "lossRate": "15%",
+        "densityInfo": "基于 1240 金价核算"
       },
       "gemstones": {
-        "main": {
-          "name": "主石描述 (如: 椭圆切工红宝石)",
-          "cut": "切工 (如: 刻面/素面/明亮式)",
-          "size": "预估尺寸 (如: 6x8mm)",
-          "qty": "数量 (如: 1粒)",
-          "setting": "镶嵌工艺 (如: 经典四爪镶)"
-        },
-        "side": [
-          {
-            "type": "副石类型 (如: 圆形白钻)",
-            "size": "尺寸 (如: 1.0mm - 1.2mm)",
-            "qty": "预估数量 (如: 约24粒)",
-            "setting": "镶嵌 (如: 显微镜微钉镶)"
-          }
-        ]
+        "main": { "name": "主石", "cut": "切工", "size": "尺寸", "qty": "1", "setting": "镶嵌" },
+        "side": [ { "type": "副石", "size": "尺寸", "qty": "数量", "setting": "镶嵌" } ]
       },
       "craftsmanship": {
-        "surfaceProcess": ["表面工艺1", "表面工艺2"],
-        "structure": "结构描述 (如: 分件执模 / 一体浇铸)",
-        "plating": "电镀要求 (如: 镀厚金 / 黑色铑金)"
+        "surfaceProcess": ["工艺1", "工艺2"],
+        "structure": "结构",
+        "plating": "电镀"
       },
       "costEstimate": {
-        "goldPriceRef": "今日参考金价 (如: 620元/克)",
-        "materialCost": "预估金料成本范围",
-        "laborCost": "预估工费 (起版+执模+镶嵌)",
-        "stoneCostRef": "配石成本预估 (不含主石)",
-        "totalEstimate": "出厂参考总价 (不含主石)",
+        "goldPriceRef": "固定参考价: 1240 元/克",
+        "materialCost": "预估金料费",
+        "laborCost": "预估工费",
+        "stoneCostRef": "配石费",
+        "totalEstimate": "总计",
         "currency": "CNY"
       },
-      "factoryNotes": [
-        "针对起版师的3-5条专业建议 (如: 注意戒臂内弧处理，保证佩戴舒适度)",
-        "针对镶嵌师的建议 (如: 爪位需做圆头抛光，防止刮衣)",
-        "结构建议 (如: 主石位底部需镂空，增加进光量)"
-      ]
+      "factoryNotes": ["建议1", "建议2"]
     }
   `;
 
-  // Use Flash model for speed and logic
+  // Use Flash 2.0 which supports Google Search for real-time data
   try {
-    const result = await executeGeneration(settings.apiKey, settings.baseUrl, prompt, cleanBase64, mimeType, {}, 'gemini-2.0-flash', 'text');
-    // Extract JSON from text (in case it's wrapped in markdown code blocks)
+    // Disable tools for fixed price
+    const toolsConfig = {}; 
+    
+    const result = await executeGeneration(
+      settings.apiKey, 
+      settings.baseUrl, 
+      prompt, 
+      cleanBase64, 
+      mimeType, 
+      toolsConfig, // No tools
+      'gemini-2.0-flash', 
+      'text'
+    );
+
     const text = result.description;
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
@@ -365,7 +345,7 @@ export const generateProductionSpecs = async (
     }
   } catch (e) {
     console.error("Specs generation error", e);
-    // Return a dummy fallback to prevent crash
+    // Return a dummy fallback
     return {
       orderNo: `ERR-${Date.now()}`,
       title: `${config.metal} ${config.type} (自动估算)`,
@@ -377,8 +357,8 @@ export const generateProductionSpecs = async (
           side: [] 
       },
       craftsmanship: { surfaceProcess: ["镜面抛光"], structure: "一体", plating: "无" },
-      costEstimate: { goldPriceRef: "-", materialCost: "0", laborCost: "0", stoneCostRef: "0", totalEstimate: "核算中", currency: "CNY" },
-      factoryNotes: ["AI 解析失败，请人工核对图片工艺。"]
+      costEstimate: { goldPriceRef: "1240 (手动)", materialCost: "0", laborCost: "0", stoneCostRef: "0", totalEstimate: "核算中", currency: "CNY" },
+      factoryNotes: ["AI服务异常，无法核算，请手动核算。"]
     };
   }
 };
@@ -455,6 +435,11 @@ async function generateViaSDK(
     if (expectedType === 'image') {
         generationConfig.imageConfig = Object.keys(imgConfig).length > 0 ? imgConfig : undefined;
     }
+    // PASS TOOLS IF PRESENT (Google Search)
+    if (config.tools) {
+        generationConfig.tools = config.tools;
+    }
+
     return generationConfig;
   };
 
@@ -510,6 +495,10 @@ async function generateViaProxy(
        generationConfig.imageConfig = Object.keys(imgConfig).length > 0 ? imgConfig : undefined;
     } else if (prompt.includes('JSON')) {
        generationConfig.responseMimeType = "application/json";
+    }
+
+    if (config.tools) {
+        generationConfig.tools = config.tools;
     }
 
     return {
