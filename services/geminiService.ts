@@ -303,37 +303,43 @@ export const generateProductionSpecs = async (
   const dateStr = new Date().toLocaleDateString(lang === 'en' ? 'en-US' : 'zh-CN');
 
   // --- MATERIAL LOGIC ---
-  const m = config.metal.toLowerCase();
-  const isPlatinum = m.includes('platinum') || m.includes('pt') || m.includes('铂金');
-  const isSilver = m.includes('silver') || m.includes('ag') || m.includes('银');
-  // Default to gold if not Pt or Ag
-  const isGold = !isPlatinum && !isSilver; 
-
-  let priceLogic = "";
+  const metalEn = translateInput(config.metal, 'en').toLowerCase();
+  
+  const isPlatinum = metalEn.includes('platinum') || metalEn.includes('pt950') || metalEn.includes('palladium');
+  const isSilver = metalEn.includes('silver') || metalEn.includes('925') || metalEn.includes('titanium');
+  
+  // Dynamic Pricing Logic to inject into prompt
+  let materialContext = "";
   if (isPlatinum) {
-     priceLogic = "Material identified as **Platinum (Pt950)**. Use base reference price: **380 CNY/g**. Density: ~21.45 g/cm³.";
+     materialContext = `
+     MATERIAL CONTEXT: PLATINUM (Pt950)
+     - Base Price: ~380 CNY/g
+     - Density: 21.45 g/cm³ (Very Heavy)
+     - Calculation: Weight * 380 * 1.2 (Process Fee)
+     `;
   } else if (isSilver) {
-     priceLogic = "Material identified as **Silver (Ag925)**. Use base reference price: **10 CNY/g**. Density: ~10.49 g/cm³.";
+     materialContext = `
+     MATERIAL CONTEXT: SILVER (Ag925) or TITANIUM
+     - Base Price: ~8-15 CNY/g
+     - Density: ~10.5 g/cm³ (Light)
+     - Calculation: Weight * 15 * 2.0 (High markup for silver craftsmanship)
+     `;
   } else {
-     priceLogic = "Material identified as **Gold** (e.g. 18K/Au750). Use base reference price for Raw Gold (Au999): **1240 CNY/g**. Density: ~15.5 g/cm³ (18K).";
+     // Gold (Default)
+     materialContext = `
+     MATERIAL CONTEXT: GOLD (18K/Au750, 14K, or 24K)
+     - Base Price (Au999): ~620 CNY/g
+     - Density: ~15.5 g/cm³ (for 18K)
+     - Calculation: (Weight * Purity e.g. 0.75) * 620 * 1.15
+     `;
   }
 
   const prompt = `
     Role: Senior Jewelry Factory Manager.
     Task: Generate a professional "Jewelry Production Order" (Factory Sheet) in ${lang === 'en' ? 'English' : 'Simplified Chinese'}.
     
-    STRICT MATERIAL & PRICING INSTRUCTION:
-    ${priceLogic}
+    ${materialContext}
     
-    Calculation Logic (Cost Estimation):
-    - **Material Cost**: 
-       - If Gold 18K: (1240 * 0.75) * 1.15 (Loss/Markup).
-       - If Platinum: 380 * 1.15.
-       - If Silver: 10 * 1.15.
-    - **Weight**: Estimate volume visually. Calculate weight = Volume * Density.
-    - **Labor Cost**: Estimate based on complexity (350-2000 CNY).
-    - **Total**: Material + Labor + Stones.
-
     Input Context (Note: Inputs may be in mixed languages, assume user wants output in ${lang === 'en' ? 'English' : 'Chinese'}):
     - Type: ${translateInput(config.type, lang)}
     - Metal: ${translateInput(config.metal, lang)}
@@ -367,7 +373,7 @@ export const generateProductionSpecs = async (
         "plating": "Plating"
       },
       "costEstimate": {
-        "goldPriceRef": "Ref Price Used (e.g. 1240 CNY/g)",
+        "goldPriceRef": "Ref Price Used (e.g. 620 CNY/g)",
         "materialCost": "Est. Metal Cost",
         "laborCost": "Est. Labor",
         "stoneCostRef": "Stone Cost",
@@ -468,7 +474,7 @@ async function generateViaSDK(
   prompt: string, 
   base64Image: string, 
   mimeType: string,
-  config: any,
+  config: any, 
   modelName: string,
   expectedType: 'image' | 'text'
 ): Promise<GenerationResult> {
