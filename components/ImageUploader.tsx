@@ -1,16 +1,21 @@
 
 import React, { useCallback, useRef } from 'react';
 import { Plus, Image as ImageIcon, Camera, Upload } from 'lucide-react';
+import { Language } from '../types';
+import { getTranslation } from '../utils/i18n';
 
 interface ImageUploaderProps {
   onImageSelected: (base64: string) => void;
   compact?: boolean;
+  lang?: Language;
 }
 
-const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageSelected, compact }) => {
+const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageSelected, compact, lang = 'zh' }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   
+  const t = (key: string) => getTranslation(lang, key);
+
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
@@ -56,7 +61,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageSelected, compact 
       <div 
         onClick={triggerFileSelect}
         className="w-full h-full bg-stone-50 flex items-center justify-center relative hover:bg-stone-100 transition-colors cursor-pointer group"
-        title="更换图片"
+        title={t('upload.title')}
       >
          <input 
           ref={fileInputRef}
@@ -108,9 +113,9 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageSelected, compact 
         </div>
         
         <div className="space-y-2 md:space-y-3 mb-8 md:mb-10">
-          <h3 className="text-stone-900 text-lg md:text-xl font-serif font-medium tracking-wide">Upload Reference</h3>
+          <h3 className="text-stone-900 text-lg md:text-xl font-serif font-medium tracking-wide">{t('upload.title')}</h3>
           <p className="text-stone-400 text-[10px] md:text-xs font-light tracking-wide">
-            上传或拍摄物品照片，AI 将为您赋予新生
+            {t('upload.subtitle')}
           </p>
         </div>
 
@@ -120,19 +125,19 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageSelected, compact 
               className="flex flex-col items-center justify-center gap-2 py-3 md:py-4 px-2 rounded-lg border border-stone-200 bg-white hover:border-stone-400 hover:bg-stone-50 transition-all duration-300 group/btn active:scale-95"
             >
               <ImageIcon className="w-4 h-4 md:w-5 md:h-5 text-stone-400 group-hover/btn:text-stone-800 transition-colors" />
-              <span className="text-[10px] font-bold uppercase tracking-widest text-stone-500 group-hover/btn:text-stone-800">Gallery</span>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-stone-500 group-hover/btn:text-stone-800">{t('upload.gallery')}</span>
             </button>
             <button
               onClick={triggerCamera}
               className="flex flex-col items-center justify-center gap-2 py-3 md:py-4 px-2 rounded-lg border border-stone-200 bg-white hover:border-champagne-400 hover:bg-champagne-50/10 transition-all duration-300 group/btn active:scale-95"
             >
               <Camera className="w-4 h-4 md:w-5 md:h-5 text-stone-400 group-hover/btn:text-champagne-600 transition-colors" />
-              <span className="text-[10px] font-bold uppercase tracking-widest text-stone-500 group-hover/btn:text-champagne-600">Camera</span>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-stone-500 group-hover/btn:text-champagne-600">{t('upload.camera')}</span>
             </button>
         </div>
         
         <p className="hidden md:block text-stone-300 text-[10px] font-light mt-8 select-none opacity-0 group-hover:opacity-100 transition-opacity duration-500">
-          Drop your image here
+          {t('upload.drop')}
         </p>
       </div>
     </div>

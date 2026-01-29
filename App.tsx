@@ -1,14 +1,16 @@
+
 import React, { useState, useEffect, useRef } from 'react';
-import { DesignConfig, MetalType, GemstoneType, JewelryType, ViewAngle, ImageSize, AspectRatio, AppState, DesignHistoryItem, AppSettings, VariationMode, VariationItem, ProductionSpecs } from './types';
+import { DesignConfig, MetalType, GemstoneType, JewelryType, ViewAngle, ImageSize, AspectRatio, AppState, DesignHistoryItem, AppSettings, VariationMode, VariationItem, ProductionSpecs, Language } from './types';
 import { generateJewelryDesign, generateJewelryVariation, generateDesignConcept, generateProductionSpecs } from './services/geminiService';
 import { getItem, setItem } from './services/storageService';
+import { getTranslation } from './utils/i18n';
 import ComparisonSlider from './components/ComparisonSlider';
 import ConfigPanel from './components/ConfigPanel';
 import ImageUploader from './components/ImageUploader';
 import CreativeCanvas from './components/CreativeCanvas';
 import HistoryDrawer from './components/HistoryDrawer';
 import ProductionSheet from './components/ProductionSheet';
-import { Gem, Download, Trash2, Loader2, Sparkles, Heart, Settings, X, Save, Wand2, Layers, User, Camera, Send, Edit, History, ArrowLeft, Feather, ChevronDown, ChevronUp, PauseCircle, AlertTriangle, Maximize2, Eye, PenTool, Image as ImageIcon, ClipboardList } from 'lucide-react';
+import { Gem, Download, Trash2, Loader2, Sparkles, Heart, Settings, X, Save, Wand2, Layers, User, Camera, Send, Edit, History, ArrowLeft, Feather, ChevronDown, ChevronUp, PauseCircle, AlertTriangle, Maximize2, Eye, PenTool, Image as ImageIcon, ClipboardList, Globe } from 'lucide-react';
 
 const LOADING_STEPS = ["Analyzing Geometry...", "Refining Details...", "Simulating Light...", "Mastering Texture..."];
 
@@ -34,7 +36,7 @@ function App() {
 
   // Settings
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [settings, setSettings] = useState<AppSettings>({ apiKey: '', baseUrl: '', modelName: '' });
+  const [settings, setSettings] = useState<AppSettings>({ apiKey: '', baseUrl: '', modelName: '', language: 'zh' });
 
   // Data State - Initialize empty, load async
   const [savedCollection, setSavedCollection] = useState<DesignHistoryItem[]>([]);
@@ -140,11 +142,18 @@ function App() {
       const saved = localStorage.getItem('lumina_settings');
       if (saved) {
         const p = JSON.parse(saved);
-        if (!p.apiKey && sysKey) setSettings({ apiKey: sysKey, baseUrl: p.baseUrl || 'https://api.apimart.ai', modelName: p.modelName || 'gemini-3-pro-image-preview' });
-        else setSettings(p);
-      } else setSettings({ apiKey: sysKey, baseUrl: 'https://api.apimart.ai', modelName: 'gemini-3-pro-image-preview' });
-    } catch { setSettings({ apiKey: sysKey, baseUrl: 'https://api.apimart.ai', modelName: 'gemini-3-pro-image-preview' }); }
+        if (!p.apiKey && sysKey) setSettings({ apiKey: sysKey, baseUrl: p.baseUrl || 'https://api.apimart.ai', modelName: p.modelName || 'gemini-3-pro-image-preview', language: p.language || 'zh' });
+        else setSettings({ ...p, language: p.language || 'zh' });
+      } else setSettings({ apiKey: sysKey, baseUrl: 'https://api.apimart.ai', modelName: 'gemini-3-pro-image-preview', language: 'zh' });
+    } catch { setSettings({ apiKey: sysKey, baseUrl: 'https://api.apimart.ai', modelName: 'gemini-3-pro-image-preview', language: 'zh' }); }
   }, []);
+
+  // Save Settings whenever they change
+  useEffect(() => {
+    if (settings.apiKey) { // Only save if initialized
+      localStorage.setItem('lumina_settings', JSON.stringify(settings));
+    }
+  }, [settings]);
 
   const handleSaveSettings = () => { localStorage.setItem('lumina_settings', JSON.stringify(settings)); setIsSettingsOpen(false); setError(null); };
   
@@ -158,6 +167,10 @@ function App() {
     aspectRatio: AspectRatio.Square,
     description: '',
   });
+
+  // Translation helper
+  const lang = settings.language || 'zh';
+  const t = (key: string) => getTranslation(lang, key);
 
   const handleImageSelected = (base64: string) => {
     setOriginalImage(base64);
@@ -231,11 +244,11 @@ function App() {
     try {
       // Step 1: Generate Image
       // Note: We are not passing signal to service yet, but we check logic after await
-      const imageResult = await generateJewelryDesign(originalImage, config);
+      const imageResult = await generateJewelryDesign(originalImage, config, lang);
       if (abortControllerRef.current?.signal.aborted) return;
 
       setGeneratedImage(imageResult.image);
-      setGeneratedDescription("正在撰写设计理念..."); // Placeholder
+      setGeneratedDescription(imageResult.description); // Placeholder text translated by service
       setAppState('RESULT'); // Show result immediately
 
       // Create the Base Variation Item Immediately
@@ -244,12 +257,12 @@ function App() {
         id: baseId,
         mode: VariationMode.ORIGINAL,
         image: imageResult.image,
-        description: "正在撰写设计理念..."
+        description: imageResult.description
       };
       setVariations([baseItem]);
 
       // Step 2: Generate Concept Text (using original image as context)
-      const conceptText = await generateDesignConcept(originalImage, config);
+      const conceptText = await generateDesignConcept(originalImage, config, lang);
       if (abortControllerRef.current?.signal.aborted) return;
 
       setGeneratedDescription(conceptText);
@@ -285,14 +298,14 @@ function App() {
     setError(null);
 
     try {
-      const result = await generateJewelryVariation(generatedImage, mode, refineText);
+      const result = await generateJewelryVariation(generatedImage, mode, refineText, lang);
       if (abortControllerRef.current?.signal.aborted) return;
       
       const newVariation: VariationItem = {
         id: Date.now().toString(),
         mode,
         image: result.image,
-        description: mode === VariationMode.REFINE ? `修改: ${refineText}` : result.description
+        description: mode === VariationMode.REFINE ? (lang === 'en' ? `Refine: ${refineText}` : `修改: ${refineText}`) : result.description
       };
 
       setVariations(prev => [...prev, newVariation]);
@@ -309,7 +322,7 @@ function App() {
 
     } catch (err: any) {
       if (abortControllerRef.current?.signal.aborted) return;
-      setError("变体生成失败: " + err.message);
+      setError(err.message);
     } finally {
       if (!abortControllerRef.current?.signal.aborted) {
         setIsGenerating(false);
@@ -321,7 +334,7 @@ function App() {
     if (!generatedImage) return;
     setIsGeneratingSpecs(true);
     try {
-      const specs = await generateProductionSpecs(generatedImage, config);
+      const specs = await generateProductionSpecs(generatedImage, config, lang);
       setProductionSpecs(specs);
       setShowProductionSheet(true);
       
@@ -332,7 +345,7 @@ function App() {
         ));
       }
     } catch (err: any) {
-      setError("工单生成失败: " + err.message);
+      setError(err.message);
     } finally {
       setIsGeneratingSpecs(false);
     }
@@ -421,12 +434,16 @@ function App() {
   };
 
   const getVariationLabel = (v: VariationItem) => {
-    if (v.mode === VariationMode.ORIGINAL) return "原创设计";
-    if (v.mode === VariationMode.REFINE) return "细节调整";
-    if (v.mode === VariationMode.VIEWS) return "三视图";
-    if (v.mode === VariationMode.MODEL) return "模特佩戴";
-    if (v.mode === VariationMode.PHOTO) return "摄影大片";
-    return v.description || "变体";
+    if (v.mode === VariationMode.ORIGINAL) return t('studio.concept'); // '原创设计'
+    if (v.mode === VariationMode.REFINE) return t('label.refine');
+    if (v.mode === VariationMode.VIEWS) return t('btn.views');
+    if (v.mode === VariationMode.MODEL) return t('btn.model');
+    if (v.mode === VariationMode.PHOTO) return t('btn.photo');
+    return v.description || "Variation";
+  };
+
+  const toggleLanguage = () => {
+    setSettings(s => ({ ...s, language: s.language === 'en' ? 'zh' : 'en' }));
   };
 
   return (
@@ -436,15 +453,24 @@ function App() {
         <div className="flex items-center gap-2 md:gap-3">
           <div className="text-champagne-400 p-1.5 rounded-full bg-stone-50 border border-stone-200"><Gem className="w-5 h-5 md:w-6 md:h-6" /></div>
           <div className="flex flex-col md:flex-row md:items-baseline md:gap-3">
-            <h1 className="text-lg md:text-2xl font-serif font-bold text-stone-900 tracking-wide">LUMINA</h1>
-            <span className="text-[10px] text-stone-400 uppercase tracking-[0.2em] font-medium hidden md:inline-block">Haute Joaillerie AI</span>
+            <h1 className="text-lg md:text-2xl font-serif font-bold text-stone-900 tracking-wide">{t('app.title')}</h1>
+            <span className="text-[10px] text-stone-400 uppercase tracking-[0.2em] font-medium hidden md:inline-block">{t('app.subtitle')}</span>
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {/* Language Toggle */}
+          <button 
+            onClick={toggleLanguage} 
+            className="flex items-center gap-1.5 px-3 py-2 rounded-full hover:bg-stone-100 text-stone-500 hover:text-stone-800 text-[10px] font-bold tracking-widest border border-transparent hover:border-stone-200 transition-all"
+          >
+             <Globe className="w-4 h-4" />
+             {lang === 'en' ? 'EN' : 'CN'}
+          </button>
+          
           <button onClick={() => setIsSettingsOpen(true)} className="p-2.5 rounded-full hover:bg-stone-100 text-stone-500 hover:text-stone-800"><Settings className="w-5 h-5" /></button>
           <button onClick={() => setIsHistoryOpen(true)} className="group flex items-center gap-2 px-3 py-2 md:px-4 rounded-full hover:bg-stone-100 text-stone-500 hover:text-stone-800">
             <History className="w-5 h-5 group-hover:text-stone-800 transition-all" />
-            <span className="hidden md:inline text-xs font-bold uppercase tracking-widest">历史 / 收藏</span>
+            <span className="hidden md:inline text-xs font-bold uppercase tracking-widest">{t('nav.history')}</span>
           </button>
         </div>
       </header>
@@ -469,13 +495,13 @@ function App() {
                           onClick={() => setInputMode('upload')}
                           className="flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all bg-stone-900 text-white shadow-md"
                         >
-                           <ImageIcon className="w-3.5 h-3.5" /> 上传照片
+                           <ImageIcon className="w-3.5 h-3.5" /> {t('mode.upload')}
                         </button>
                         <button 
                           onClick={() => setInputMode('canvas')}
                           className="flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all text-stone-500 hover:text-stone-800"
                         >
-                           <PenTool className="w-3.5 h-3.5" /> 手绘草图
+                           <PenTool className="w-3.5 h-3.5" /> {t('mode.canvas')}
                         </button>
                      </div>
                   </div>
@@ -484,11 +510,12 @@ function App() {
                 {/* Content Area */}
                 <div className="flex-1 min-h-0 w-full max-w-4xl mx-auto rounded-2xl overflow-hidden shadow-soft border border-stone-100 bg-white animate-fade-in-up">
                    {inputMode === 'upload' ? (
-                      <ImageUploader onImageSelected={handleImageSelected} />
+                      <ImageUploader onImageSelected={handleImageSelected} lang={lang} />
                    ) : (
                       <CreativeCanvas 
                         onConfirm={handleImageSelected} 
                         onCancel={() => setInputMode('upload')}
+                        lang={lang}
                       />
                    )}
                 </div>
@@ -502,6 +529,7 @@ function App() {
                           originalImage={originalImage} 
                           generatedImage={generatedImage} 
                           onImageClick={() => setIsImageZoomed(true)}
+                          lang={lang}
                         />
                     ) : (
                       <>
@@ -571,14 +599,14 @@ function App() {
                <div className="p-5 md:p-6 space-y-6 md:space-y-8 animate-fade-in-up pb-24 md:pb-6">
                   {/* ... (Existing Creative Studio Content) ... */}
                   <div className="space-y-1 md:space-y-2">
-                    <h2 className="text-xl md:text-2xl font-serif text-stone-900 flex items-center gap-2"><Wand2 className="w-5 h-5 text-champagne-500" /> 创意工坊</h2>
-                    <p className="text-[10px] md:text-xs text-stone-500">CREATIVE STUDIO & REFINEMENT</p>
+                    <h2 className="text-xl md:text-2xl font-serif text-stone-900 flex items-center gap-2"><Wand2 className="w-5 h-5 text-champagne-500" /> {t('studio.workshop')}</h2>
+                    <p className="text-[10px] md:text-xs text-stone-500">{t('studio.workshop_sub')}</p>
                   </div>
 
                   {generatedDescription && (
                     <div className="animate-fade-in-up delay-100">
                       <button onClick={() => setShowDescription(!showDescription)} className="w-full flex items-center justify-between mb-2 group">
-                         <div className="flex items-center gap-2"><div className="h-px w-6 bg-champagne-400"></div><span className="font-serif text-stone-900 text-sm tracking-wide italic">Design Concept</span></div>
+                         <div className="flex items-center gap-2"><div className="h-px w-6 bg-champagne-400"></div><span className="font-serif text-stone-900 text-sm tracking-wide italic">{t('studio.concept')}</span></div>
                          <div className="text-stone-400 group-hover:text-champagne-500 transition-colors">{showDescription ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}</div>
                       </button>
                       {showDescription && (
@@ -598,10 +626,10 @@ function App() {
                   )}
 
                   <div className="space-y-3">
-                     <label className="text-[10px] font-bold uppercase tracking-widest text-stone-400">智能修改 (Refine)</label>
+                     <label className="text-[10px] font-bold uppercase tracking-widest text-stone-400">{t('label.refine')}</label>
                      <div className="flex gap-2">
                         <div className="relative flex-1">
-                           <input type="text" value={refineText} onChange={(e) => setRefineText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && !isGenerating && handleVariation(VariationMode.REFINE)} disabled={isGenerating} placeholder="例如：改为玫瑰金..." className="w-full bg-stone-50 border border-stone-200 rounded-xl pl-4 pr-10 py-3 text-sm focus:border-champagne-400 outline-none disabled:opacity-50 disabled:cursor-not-allowed" />
+                           <input type="text" value={refineText} onChange={(e) => setRefineText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && !isGenerating && handleVariation(VariationMode.REFINE)} disabled={isGenerating} placeholder={t('placeholder.refine')} className="w-full bg-stone-50 border border-stone-200 rounded-xl pl-4 pr-10 py-3 text-sm focus:border-champagne-400 outline-none disabled:opacity-50 disabled:cursor-not-allowed" />
                            <Edit className="absolute right-3 top-3 w-4 h-4 text-stone-400" />
                         </div>
                         <button onClick={() => handleVariation(VariationMode.REFINE)} disabled={!refineText.trim() || isGenerating} className="bg-stone-900 text-white p-3 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed hover:bg-stone-700 flex-shrink-0 transition-all"><Send className="w-4 h-4" /></button>
@@ -609,12 +637,12 @@ function App() {
                   </div>
 
                   <div className="space-y-3">
-                     <label className="text-[10px] font-bold uppercase tracking-widest text-stone-400">一键生成 (Quick Gen)</label>
+                     <label className="text-[10px] font-bold uppercase tracking-widest text-stone-400">{t('label.quick_gen')}</label>
                      <div className="grid grid-cols-3 gap-2 md:gap-3">
                         {[
-                          { mode: VariationMode.VIEWS, icon: Layers, label: '三视图' },
-                          { mode: VariationMode.MODEL, icon: User, label: '模特试戴' },
-                          { mode: VariationMode.PHOTO, icon: Camera, label: '摄影大片' }
+                          { mode: VariationMode.VIEWS, icon: Layers, label: t('btn.views') },
+                          { mode: VariationMode.MODEL, icon: User, label: t('btn.model') },
+                          { mode: VariationMode.PHOTO, icon: Camera, label: t('btn.photo') }
                         ].map((btn) => (
                            <button key={btn.mode} onClick={() => handleVariation(btn.mode)} disabled={isGenerating} className="flex flex-col items-center justify-center gap-2 p-3 md:p-4 rounded-xl border border-stone-100 bg-stone-50 hover:border-champagne-400 hover:bg-white transition-all group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-stone-50 disabled:hover:border-stone-100">
                               <btn.icon className="w-5 h-5 md:w-6 md:h-6 text-stone-400 group-hover:text-champagne-500 disabled:group-hover:text-stone-400" />
@@ -624,7 +652,7 @@ function App() {
                      </div>
                   </div>
                   
-                  {/* Production Specs Button - Newly Added */}
+                  {/* Production Specs Button */}
                   <div className="pt-2">
                      <button 
                         onClick={() => productionSpecs ? setShowProductionSheet(true) : handleGenerateSpecs()} 
@@ -633,24 +661,24 @@ function App() {
                      >
                         {isGeneratingSpecs ? (
                           <>
-                             <Loader2 className="w-4 h-4 animate-spin" /> 工单计算中...
+                             <Loader2 className="w-4 h-4 animate-spin" /> {t('specs.calculating')}
                           </>
                         ) : (
                           <>
-                             <ClipboardList className="w-4 h-4" /> {productionSpecs ? '查看生产工单' : '生成工厂工单'}
+                             <ClipboardList className="w-4 h-4" /> {productionSpecs ? t('btn.specs') : t('btn.gen_specs')}
                           </>
                         )}
                      </button>
                      <p className="text-[10px] text-center text-stone-400 mt-2">
-                        * AI 自动核算金重、宝石参数及预估成本
+                        {t('specs.note')}
                      </p>
                   </div>
 
                   <div className="pt-4 border-t border-stone-100 flex flex-col gap-3">
                      <button onClick={() => handleToggleFavorite()} disabled={isGenerating} className={`w-full py-3 rounded-xl border font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${isSaved ? 'bg-red-50 border-red-200 text-red-500' : 'border-stone-200 text-stone-600 hover:border-stone-400'} disabled:opacity-50 disabled:cursor-not-allowed`}>
-                        <Heart className={`w-4 h-4 ${isSaved ? 'fill-current' : ''}`} /> {isSaved ? '已收藏' : '收藏设计'}
+                        <Heart className={`w-4 h-4 ${isSaved ? 'fill-current' : ''}`} /> {isSaved ? t('btn.favorited') : t('btn.favorite')}
                      </button>
-                     <button onClick={() => setAppState('CONFIGURING')} disabled={isGenerating} className="w-full py-3 text-stone-400 text-xs hover:text-stone-600 disabled:opacity-50 disabled:cursor-not-allowed">返回参数配置</button>
+                     <button onClick={() => setAppState('CONFIGURING')} disabled={isGenerating} className="w-full py-3 text-stone-400 text-xs hover:text-stone-600 disabled:opacity-50 disabled:cursor-not-allowed">{t('btn.back')}</button>
                   </div>
                </div>
             ) : (
@@ -658,15 +686,15 @@ function App() {
                <div className="p-5 md:p-8 pb-32 md:pb-8">
                  {generatedImage && (
                     <button onClick={() => setAppState('RESULT')} className="w-full mb-6 py-3 bg-stone-100 text-stone-600 rounded-xl font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-stone-200 transition-all border border-stone-200 hover:border-stone-300">
-                       <Wand2 className="w-4 h-4 text-champagne-500" /> 返回创意工坊
+                       <Wand2 className="w-4 h-4 text-champagne-500" /> {t('btn.return_studio')}
                     </button>
                  )}
-                 <ConfigPanel config={config} setConfig={setConfig} onGenerate={handleGenerate} isGenerating={isGenerating} disabled={!originalImage} />
+                 <ConfigPanel config={config} setConfig={setConfig} onGenerate={handleGenerate} isGenerating={isGenerating} disabled={!originalImage} lang={lang} />
                  {originalImage && (
                     <div className="md:hidden fixed bottom-0 left-0 right-0 p-4 bg-white/95 backdrop-blur border-t border-stone-100 z-50">
                       <button onClick={handleGenerate} disabled={isGenerating} className="w-full bg-stone-900 text-white py-3.5 rounded-xl font-bold tracking-[0.2em] uppercase flex items-center justify-center gap-2 shadow-xl disabled:opacity-50">
                         {isGenerating ? <Loader2 className="animate-spin w-4 h-4" /> : <Sparkles className="w-4 h-4" />}
-                        {isGenerating ? 'GENERATING...' : 'GENERATE DESIGN'}
+                        {isGenerating ? t('btn.generating') : t('btn.generate')}
                       </button>
                     </div>
                  )}
@@ -711,6 +739,7 @@ function App() {
           specs={productionSpecs} 
           image={generatedImage} 
           onClose={() => setShowProductionSheet(false)} 
+          lang={lang}
         />
       )}
 
@@ -731,7 +760,7 @@ function App() {
         </div>
       )}
 
-      {/* Full Screen Image Modal (Ensure lower z-index than Production Sheet if needed, currently 100 vs 100 might conflict if both open, but logically mutually exclusive mostly) */}
+      {/* Full Screen Image Modal */}
       {isImageZoomed && generatedImage && !showProductionSheet && (
         <div className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-xl animate-fade-in flex flex-col">
           <div className="flex-none p-4 md:p-6 flex justify-between items-center text-white/80">

@@ -1,14 +1,17 @@
 
 import React, { useState, useRef, useCallback } from 'react';
 import { ChevronsLeftRight, ScanLine } from 'lucide-react';
+import { getTranslation } from '../utils/i18n';
+import { Language } from '../types';
 
 interface ComparisonSliderProps {
   originalImage: string;
   generatedImage: string;
   onImageClick?: () => void;
+  lang?: Language;
 }
 
-const ComparisonSlider: React.FC<ComparisonSliderProps> = ({ originalImage, generatedImage, onImageClick }) => {
+const ComparisonSlider: React.FC<ComparisonSliderProps> = ({ originalImage, generatedImage, onImageClick, lang = 'zh' }) => {
   const [sliderPosition, setSliderPosition] = useState(50);
   const [isResizing, setIsResizing] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -61,7 +64,7 @@ const ComparisonSlider: React.FC<ComparisonSliderProps> = ({ originalImage, gene
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
-      title="拖拽对比 / 点击放大"
+      title="Drag to Compare / Click to Zoom"
     >
       {/* 
         Background Pattern 
@@ -87,7 +90,7 @@ const ComparisonSlider: React.FC<ComparisonSliderProps> = ({ originalImage, gene
         <div className="absolute bottom-4 right-4 md:bottom-6 md:right-6 pointer-events-none transition-all duration-500 opacity-80 group-hover:opacity-100 group-hover:translate-x-0 translate-x-2">
           <div className="flex items-center gap-2">
             <span className="bg-stone-900/80 backdrop-blur-md text-champagne-300 px-3 py-1.5 rounded-lg text-[10px] md:text-xs font-bold tracking-widest shadow-lg border border-white/10 uppercase">
-              AI Design
+              {getTranslation(lang, 'label.designed')}
             </span>
           </div>
         </div>
@@ -119,7 +122,7 @@ const ComparisonSlider: React.FC<ComparisonSliderProps> = ({ originalImage, gene
         <div className="absolute bottom-4 left-4 md:bottom-6 md:left-6 pointer-events-none transition-all duration-500 opacity-80 group-hover:opacity-100 group-hover:translate-x-0 -translate-x-2">
           <div className="flex items-center gap-2">
             <span className="bg-white/80 backdrop-blur-md text-stone-600 px-3 py-1.5 rounded-lg text-[10px] md:text-xs font-bold tracking-widest shadow-sm border border-stone-200 uppercase">
-              Original
+              {getTranslation(lang, 'label.original')}
             </span>
           </div>
         </div>

@@ -1,5 +1,7 @@
+
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { Pencil, Eraser, Move, Undo2, Trash2, Check, X, Palette, Circle, Star, Heart, Sparkles, SlidersHorizontal, ZoomIn, ZoomOut, Hand, Maximize, GripVertical, RotateCw } from 'lucide-react';
+import { Language } from '../types';
 
 // --- Assets / Icons for Gems ---
 const GEM_ASSETS = [
@@ -23,12 +25,13 @@ interface GemObject {
 interface CreativeCanvasProps {
   onConfirm: (base64: string) => void;
   onCancel: () => void;
+  lang?: Language;
 }
 
 type Tool = 'pencil' | 'marker' | 'gold' | 'eraser' | 'move' | 'hand';
 type BrushTip = 'round' | 'star' | 'heart' | 'sparkle';
 
-const CreativeCanvas: React.FC<CreativeCanvasProps> = ({ onConfirm, onCancel }) => {
+const CreativeCanvas: React.FC<CreativeCanvasProps> = ({ onConfirm, onCancel, lang = 'zh' }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null); // Refers to the canvas wrapper div specifically
   const transformLayerRef = useRef<HTMLDivElement>(null);
@@ -508,7 +511,7 @@ const CreativeCanvas: React.FC<CreativeCanvasProps> = ({ onConfirm, onCancel }) 
               onClick={handleExport}
               className="bg-stone-900 text-white px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider flex items-center gap-2 hover:bg-stone-700 shadow-md transition-all active:scale-95"
             >
-              <Check className="w-4 h-4" /> 使用设计
+              <Check className="w-4 h-4" /> {lang === 'en' ? 'USE' : '使用设计'}
             </button>
          </div>
       </div>
@@ -784,12 +787,12 @@ const CreativeCanvas: React.FC<CreativeCanvasProps> = ({ onConfirm, onCancel }) 
              {/* Brush Tools */}
              <div className="flex flex-row md:flex-col gap-2 shrink-0">
                 {[
-                  { id: 'move', icon: Move, label: '移动', color: 'text-stone-800' },
-                  { id: 'hand', icon: Hand, label: '抓手', color: 'text-stone-800' },
-                  { id: 'pencil', icon: Pencil, label: '铅笔', color: 'text-stone-600' },
-                  { id: 'gold', icon: Palette, label: '金笔', color: 'text-champagne-500' },
-                  { id: 'marker', icon: SlidersHorizontal, label: '马克', color: 'text-stone-800' },
-                  { id: 'eraser', icon: Eraser, label: '橡皮', color: 'text-stone-400' },
+                  { id: 'move', icon: Move, label: lang === 'en' ? 'Move' : '移动', color: 'text-stone-800' },
+                  { id: 'hand', icon: Hand, label: lang === 'en' ? 'Pan' : '抓手', color: 'text-stone-800' },
+                  { id: 'pencil', icon: Pencil, label: lang === 'en' ? 'Pencil' : '铅笔', color: 'text-stone-600' },
+                  { id: 'gold', icon: Palette, label: lang === 'en' ? 'Gold' : '金笔', color: 'text-champagne-500' },
+                  { id: 'marker', icon: SlidersHorizontal, label: lang === 'en' ? 'Marker' : '马克', color: 'text-stone-800' },
+                  { id: 'eraser', icon: Eraser, label: lang === 'en' ? 'Erase' : '橡皮', color: 'text-stone-400' },
                 ].map((t) => (
                    <button
                      key={t.id}

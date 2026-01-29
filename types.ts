@@ -1,4 +1,6 @@
 
+export type Language = 'zh' | 'en';
+
 export enum MetalType {
   Any = '自定义/智能搭配',
   YellowGold18K = '18K 黄金',
@@ -96,6 +98,7 @@ export interface AppSettings {
   apiKey: string;
   baseUrl: string;
   modelName?: string;
+  language?: Language;
 }
 
 export type AppState = 'IDLE' | 'CONFIGURING' | 'GENERATING' | 'RESULT';

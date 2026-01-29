@@ -1,7 +1,8 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { DesignConfig, MetalType, GemstoneType, JewelryType, ViewAngle, ImageSize, AspectRatio } from '../types';
+import { DesignConfig, MetalType, GemstoneType, JewelryType, ViewAngle, ImageSize, AspectRatio, Language } from '../types';
 import { Loader2, Sparkles, ChevronDown, Check } from 'lucide-react';
+import { getTranslation } from '../utils/i18n';
 
 interface ConfigPanelProps {
   config: DesignConfig;
@@ -9,6 +10,7 @@ interface ConfigPanelProps {
   onGenerate: () => void;
   isGenerating: boolean;
   disabled: boolean;
+  lang: Language;
 }
 
 interface CustomSelectProps {
@@ -18,18 +20,20 @@ interface CustomSelectProps {
   options: Record<string, string>;
   delayClass?: string;
   disabled?: boolean;
+  lang: Language;
 }
 
-const AUX_OPTIONS = [
-  '无需辅石', 
-  '微镶碎钻 Halo', 
-  '蓝宝石点缀', 
-  '复古花丝', 
-  '珍珠流苏', 
-  '极简线条'
+// Keys for auxiliary options to be translated
+const AUX_KEYS = [
+  'aux.none', 
+  'aux.halo', 
+  'aux.sapphire', 
+  'aux.filigree', 
+  'aux.pearl', 
+  'aux.minimal'
 ];
 
-const CustomSelect: React.FC<CustomSelectProps> = ({ label, value, onChange, options, delayClass, disabled }) => {
+const CustomSelect: React.FC<CustomSelectProps> = ({ label, value, onChange, options, delayClass, disabled, lang }) => {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -47,6 +51,21 @@ const CustomSelect: React.FC<CustomSelectProps> = ({ label, value, onChange, opt
       document.removeEventListener('touchstart', handleClickOutside);
     };
   }, []);
+
+  // Helper to get display label for option values
+  const getDisplayLabel = (val: string) => {
+     // Find the key in the options object where options[key] === val
+     // The 'val' passed here is the Chinese string value from the Enum (e.g. "18K 黄金")
+     const key = Object.keys(options).find(k => options[k] === val);
+     if (key) {
+        // Construct a translation key like 'enum.yellowgold18k'
+        const i18nKey = `enum.${key.toLowerCase()}`;
+        const translated = getTranslation(lang, i18nKey);
+        // If translation returns key, it failed, so return original value
+        if (translated !== i18nKey) return translated;
+     }
+     return val;
+  };
 
   return (
     <div 
@@ -74,7 +93,7 @@ const CustomSelect: React.FC<CustomSelectProps> = ({ label, value, onChange, opt
             }
           `}
         >
-          <span className="truncate">{value}</span>
+          <span className="truncate">{getDisplayLabel(value)}</span>
           <ChevronDown 
             className={`w-4 h-4 text-stone-400 transition-transform duration-500 cubic-bezier(0.4, 0, 0.2, 1) ${isOpen ? 'rotate-180 text-champagne-500' : 'group-hover:text-champagne-500'}`} 
           />
@@ -107,7 +126,7 @@ const CustomSelect: React.FC<CustomSelectProps> = ({ label, value, onChange, opt
                   }
                 `}
               >
-                <span className="truncate mr-2">{optionValue}</span>
+                <span className="truncate mr-2">{getDisplayLabel(optionValue)}</span>
                 {value === optionValue && <Check className="w-3.5 h-3.5 text-champagne-500 flex-shrink-0" />}
               </div>
             ))}
@@ -118,65 +137,70 @@ const CustomSelect: React.FC<CustomSelectProps> = ({ label, value, onChange, opt
   );
 };
 
-const ConfigPanel: React.FC<ConfigPanelProps> = ({ config, setConfig, onGenerate, isGenerating, disabled }) => {
+const ConfigPanel: React.FC<ConfigPanelProps> = ({ config, setConfig, onGenerate, isGenerating, disabled, lang }) => {
   
-  const handleChange = (field: keyof DesignConfig, value: string) => {
+  const handleChange = (field: keyof DesignConfig, value: any) => {
     setConfig(prev => ({ ...prev, [field]: value }));
   };
+  
+  const t = (key: string) => getTranslation(lang, key);
 
   return (
     <div className="flex flex-col space-y-8 pb-10">
       
       <div className="space-y-2 animate-fade-in-up opacity-0 fill-mode-forwards" style={{ animationDelay: '0ms' }}>
-        <h2 className="text-2xl md:text-3xl font-serif text-stone-900">Design Studio</h2>
-        <p className="text-xs text-stone-500 font-medium tracking-wide">CUSTOMIZE YOUR JEWELRY</p>
+        <h2 className="text-2xl md:text-3xl font-serif text-stone-900">{t('studio.title')}</h2>
+        <p className="text-xs text-stone-500 font-medium tracking-wide">{t('studio.subtitle')}</p>
       </div>
 
       <div className="space-y-6">
         <div className="grid grid-cols-2 gap-4 md:gap-6 relative z-30">
-          <CustomSelect label="Jewelry Type" value={config.type} onChange={(v) => handleChange('type', v)} options={JewelryType} delayClass="delay-[100ms]" disabled={disabled} />
-          <CustomSelect label="Quality" value={config.imageSize} onChange={(v) => handleChange('imageSize', v)} options={ImageSize} delayClass="delay-[125ms]" disabled={disabled} />
+          <CustomSelect label={t('label.type')} value={config.type} onChange={(v) => handleChange('type', v)} options={JewelryType} delayClass="delay-[100ms]" disabled={disabled} lang={lang} />
+          <CustomSelect label={t('label.quality')} value={config.imageSize} onChange={(v) => handleChange('imageSize', v)} options={ImageSize} delayClass="delay-[125ms]" disabled={disabled} lang={lang} />
         </div>
 
         <div className="grid grid-cols-2 gap-4 md:gap-6 relative z-20">
-          <CustomSelect label="Metal" value={config.metal} onChange={(v) => handleChange('metal', v)} options={MetalType} delayClass="delay-[200ms]" disabled={disabled} />
-          <CustomSelect label="Gemstone" value={config.gemstone} onChange={(v) => handleChange('gemstone', v)} options={GemstoneType} delayClass="delay-[250ms]" disabled={disabled} />
+          <CustomSelect label={t('label.metal')} value={config.metal} onChange={(v) => handleChange('metal', v)} options={MetalType} delayClass="delay-[200ms]" disabled={disabled} lang={lang} />
+          <CustomSelect label={t('label.gemstone')} value={config.gemstone} onChange={(v) => handleChange('gemstone', v)} options={GemstoneType} delayClass="delay-[250ms]" disabled={disabled} lang={lang} />
         </div>
         
         <div className="grid grid-cols-2 gap-4 md:gap-6 relative z-10">
-           <CustomSelect label="Perspective" value={config.viewAngle} onChange={(v) => handleChange('viewAngle', v)} options={ViewAngle} delayClass="delay-[150ms]" disabled={disabled} />
-           <CustomSelect label="Aspect Ratio" value={config.aspectRatio} onChange={(v) => handleChange('aspectRatio', v)} options={AspectRatio} delayClass="delay-[175ms]" disabled={disabled} />
+           <CustomSelect label={t('label.perspective')} value={config.viewAngle} onChange={(v) => handleChange('viewAngle', v)} options={ViewAngle} delayClass="delay-[150ms]" disabled={disabled} lang={lang} />
+           <CustomSelect label={t('label.aspectRatio')} value={config.aspectRatio} onChange={(v) => handleChange('aspectRatio', v)} options={AspectRatio} delayClass="delay-[175ms]" disabled={disabled} lang={lang} />
         </div>
 
         <div className="space-y-3 group animate-fade-in-up opacity-0 fill-mode-forwards delay-[300ms] relative z-0">
           <label className="text-[10px] text-stone-500 font-bold tracking-[0.15em] uppercase pl-1 transition-colors duration-300 group-hover:text-champagne-600">
-            Auxiliary / Details
+            {t('label.aux')}
           </label>
           <div className="space-y-3">
              <div className="flex flex-wrap gap-2">
-                {AUX_OPTIONS.map((opt) => (
-                  <button
-                    key={opt}
-                    onClick={() => handleChange('auxiliaryStone', opt)}
-                    disabled={disabled}
-                    className={`
-                      text-[10px] md:text-[11px] px-3 py-2 md:py-1.5 rounded-full border transition-all duration-300
-                      ${config.auxiliaryStone === opt 
-                        ? 'bg-stone-800 text-white border-stone-800 shadow-md' 
-                        : 'bg-white text-stone-500 border-stone-200 hover:border-champagne-400 hover:text-champagne-600'}
-                      ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
-                    `}
-                  >
-                    {opt}
-                  </button>
-                ))}
+                {AUX_KEYS.map((key) => {
+                  const translatedLabel = t(key);
+                  return (
+                    <button
+                      key={key}
+                      onClick={() => handleChange('auxiliaryStone', translatedLabel)}
+                      disabled={disabled}
+                      className={`
+                        text-[10px] md:text-[11px] px-3 py-2 md:py-1.5 rounded-full border transition-all duration-300
+                        ${config.auxiliaryStone === translatedLabel 
+                          ? 'bg-stone-800 text-white border-stone-800 shadow-md' 
+                          : 'bg-white text-stone-500 border-stone-200 hover:border-champagne-400 hover:text-champagne-600'}
+                        ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
+                      `}
+                    >
+                      {translatedLabel}
+                    </button>
+                  );
+                })}
              </div>
             <input
               type="text"
               value={config.auxiliaryStone}
               onChange={(e) => handleChange('auxiliaryStone', e.target.value)}
               disabled={disabled}
-              placeholder="自定义描述 (选填)..."
+              placeholder={t('placeholder.aux')}
               className="w-full bg-white border border-stone-200 rounded-lg px-4 py-3.5 md:py-3 text-base md:text-sm text-stone-700 
               focus:outline-none focus:border-champagne-500 focus:ring-1 focus:ring-champagne-500/20
               transition-all duration-300 placeholder-stone-300"
@@ -186,14 +210,14 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ config, setConfig, onGenerate
 
         <div className="space-y-3 group animate-fade-in-up opacity-0 fill-mode-forwards delay-[350ms]">
           <label className="text-[10px] text-stone-500 font-bold tracking-[0.15em] uppercase pl-1 transition-colors duration-300 group-hover:text-champagne-600">
-            Vision & Inspiration
+            {t('label.inspiration')}
           </label>
           <div className="relative transform transition-all duration-300 group-hover:-translate-y-0.5">
             <textarea
               value={config.description}
               onChange={(e) => handleChange('description', e.target.value)}
               disabled={disabled}
-              placeholder="描述您的设计灵感，例如：我想把这个形状做成一个复古风格的胸针，展现..."
+              placeholder={t('placeholder.inspiration')}
               className="w-full bg-white border border-stone-200 rounded-lg px-4 py-3 text-base md:text-sm text-stone-700 
               focus:outline-none focus:border-champagne-500 focus:ring-1 focus:ring-champagne-500/20
               transition-all duration-300 placeholder-stone-300 min-h-[120px] resize-none leading-relaxed"
@@ -252,7 +276,7 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ config, setConfig, onGenerate
                   <Loader2 className="w-5 h-5 text-champagne-400 animate-spin" />
                   <div className="absolute inset-0 bg-champagne-400/30 blur-md animate-pulse"></div>
                 </div>
-                <span className="text-xs font-bold tracking-[0.25em] uppercase text-champagne-100">Crafting...</span>
+                <span className="text-xs font-bold tracking-[0.25em] uppercase text-champagne-100">{t('status.crafting')}</span>
               </>
             ) : (
               <>
@@ -268,7 +292,7 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ config, setConfig, onGenerate
                    ${disabled ? 'text-stone-400' : 'text-stone-200 group-hover:text-white'}
                    transition-colors duration-300
                 `}>
-                   Generate Design
+                   {t('btn.generate')}
                 </span>
               </>
             )}

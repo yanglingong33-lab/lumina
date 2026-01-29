@@ -17,7 +17,39 @@ const FALLBACK_MODELS = [
   'gemini-2.0-flash-exp'
 ];
 
-const TYPE_TRANSLATIONS: Record<string, string> = {
+// Simple Translation Map for Inputs (Chinese Enums -> English)
+const EN_TERMS: Record<string, string> = {
+  // Metals
+  '自定义/智能搭配': 'Custom/Smart Match',
+  '18K 黄金': '18K Yellow Gold',
+  '18K 白金': '18K White Gold',
+  '18K 玫瑰金': '18K Rose Gold',
+  '24K 足金': '24K Pure Gold',
+  '14K 黄金': '14K Gold',
+  '9K 黄金': '9K Gold',
+  '铂金 PT950': 'Platinum PT950',
+  '钯金': 'Palladium',
+  '925 纯银': '925 Sterling Silver',
+  '钛金属': 'Titanium',
+  // Gems
+  '钻石': 'Diamond',
+  '莫桑钻': 'Moissanite',
+  '红宝石': 'Ruby',
+  '蓝宝石': 'Sapphire',
+  '祖母绿': 'Emerald',
+  '紫水晶': 'Amethyst',
+  '海蓝宝石': 'Aquamarine',
+  '摩根石': 'Morganite',
+  '坦桑石': 'Tanzanite',
+  '珍珠': 'Pearl',
+  '欧泊': 'Opal',
+  '翡翠': 'Jade',
+  '黄水晶': 'Citrine',
+  '橄榄石': 'Peridot',
+  '石榴石': 'Garnet',
+  '碧玺': 'Tourmaline',
+  '无主石': 'No Main Stone',
+  // Types
   '戒指': 'Ring',
   '项链': 'Necklace',
   '耳饰': 'Earrings',
@@ -25,7 +57,10 @@ const TYPE_TRANSLATIONS: Record<string, string> = {
   '胸针': 'Brooch'
 };
 
-const getEnglishType = (type: string) => TYPE_TRANSLATIONS[type] || type;
+const translateInput = (val: string, lang: 'zh' | 'en') => {
+  if (lang === 'zh') return val;
+  return EN_TERMS[val] || val;
+};
 
 /**
  * Helper to get settings
@@ -64,7 +99,8 @@ const getSettings = () => {
  */
 export const generateJewelryDesign = async (
   base64Image: string,
-  config: DesignConfig
+  config: DesignConfig,
+  lang: 'zh' | 'en' = 'zh'
 ): Promise<GenerationResult> => {
   const settings = getSettings();
   if (!settings.apiKey) throw new Error("AUTH_ERROR: 未配置 API Key。");
@@ -74,17 +110,21 @@ export const generateJewelryDesign = async (
   const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
   const cleanBase64 = base64Image.replace(/^data:image\/[a-zA-Z+]+;base64,/, '');
 
-  // Smart Prompt Construction
-  const isSmartMetal = config.metal.includes('智能') || config.metal.includes('自定义');
-  const metalPrompt = isSmartMetal ? 'luxurious precious metal fitting the style' : config.metal;
+  // Smart Prompt Construction - Always using English for Image Generation prompt to ensure quality
+  const metalEn = translateInput(config.metal, 'en');
+  const gemEn = translateInput(config.gemstone, 'en');
+  const typeEn = translateInput(config.type, 'en');
+  
+  const isSmartMetal = metalEn.includes('Smart') || metalEn.includes('Custom');
+  const metalPrompt = isSmartMetal ? 'luxurious precious metal fitting the style' : metalEn;
 
   let gemstonePrompt = "";
-  if (config.gemstone === '无主石') {
+  if (gemEn === 'No Main Stone') {
     gemstonePrompt = "focusing on pure sculptural metalwork, no main gemstone";
-  } else if (config.gemstone.includes('智能') || config.gemstone.includes('自定义')) {
+  } else if (gemEn.includes('Smart') || gemEn.includes('Custom')) {
     gemstonePrompt = "featuring high-grade precious gemstones that complement the design";
   } else {
-    gemstonePrompt = `featuring high-grade ${config.gemstone}`;
+    gemstonePrompt = `featuring high-grade ${gemEn}`;
   }
 
   // Revised Prompt for Maximum Realism - IMAGE FOCUSED
@@ -93,7 +133,7 @@ export const generateJewelryDesign = async (
     Task: Re-imagine the item in the image as a museum-grade luxury jewelry piece.
     
     PHOTOREALISTIC VISUALIZATION SPECS:
-    - Subject: A single ${config.type} made of polished ${metalPrompt}, ${gemstonePrompt}, and ${config.auxiliaryStone || 'refined detailing'}.
+    - Subject: A single ${typeEn} made of polished ${metalPrompt}, ${gemstonePrompt}, and ${config.auxiliaryStone || 'refined detailing'}.
     - Perspective: ${config.viewAngle}.
     - Lighting: Professional studio softbox lighting.
     - Style: ${config.description || 'Modern Elegance'}.
@@ -102,11 +142,10 @@ export const generateJewelryDesign = async (
     Constraint: NO text, NO watermarks. The piece must feel physically heavy and correctly seated.
   `;
 
-  // We only expect an image here
   const result = await executeGeneration(settings.apiKey, settings.baseUrl, prompt, cleanBase64, mimeType, config, settings.modelName, 'image');
   return {
     image: result.image,
-    description: "正在撰写设计理念..." // Placeholder
+    description: lang === 'en' ? "Drafting concept..." : "正在撰写设计理念..." 
   };
 };
 
@@ -116,7 +155,8 @@ export const generateJewelryDesign = async (
  */
 export const generateDesignConcept = async (
   base64Image: string,
-  config: DesignConfig
+  config: DesignConfig,
+  lang: 'zh' | 'en' = 'zh'
 ): Promise<string> => {
   const settings = getSettings();
   if (!settings.apiKey) throw new Error("AUTH_ERROR: 未配置 API Key。");
@@ -127,32 +167,32 @@ export const generateDesignConcept = async (
 
   const prompt = `
     Role: Senior Jewelry Designer.
-    Task: Write a "Design Concept" (设计理念) in Chinese based on the provided reference image and the design parameters.
+    Task: Write a "Design Concept" in ${lang === 'en' ? 'English' : 'Chinese'} based on the provided reference image and the design parameters.
     
     Design Parameters:
-    - Type: ${config.type}
-    - Material: ${config.metal}
-    - Gemstone: ${config.gemstone}
+    - Type: ${translateInput(config.type, lang)}
+    - Material: ${translateInput(config.metal, lang)}
+    - Gemstone: ${translateInput(config.gemstone, lang)}
     - Details: ${config.auxiliaryStone || 'Classic setting'}
     - User Inspiration: ${config.description || 'None'}
     
     Requirements:
-    1. Title: Create a poetic 4-character Chinese title for this piece (e.g., "晨曦之露").
+    1. Title: Create a poetic ${lang === 'en' ? 'short title' : '4-character Chinese title'} for this piece.
     2. Concept: Describe the inspiration, craftsmanship, and the aesthetic narrative (approx. 100-120 words).
     3. Tone: Elegant, luxurious, professional.
+    ${lang === 'en' ? 'IMPORTANT: Output MUST be entirely in English.' : ''}
     
     Output Format:
     Return ONLY the text. No markdown formatting like ** or ## around the title.
     Start with the title, then a new line, then the concept body.
   `;
 
-  // Use a faster/text-capable model for this step. No imageConfig needed.
   try {
     const result = await executeGeneration(settings.apiKey, settings.baseUrl, prompt, cleanBase64, mimeType, {}, TEXT_MODEL, 'text');
     return result.description;
   } catch (e) {
     console.warn("Concept generation failed, using default.", e);
-    return "设计理念生成中..."; 
+    return lang === 'en' ? "Generating concept..." : "设计理念生成中..."; 
   }
 };
 
@@ -162,7 +202,8 @@ export const generateDesignConcept = async (
 export const generateJewelryVariation = async (
   generatedImageBase64: string,
   mode: VariationMode,
-  refinePrompt?: string
+  refinePrompt?: string,
+  lang: 'zh' | 'en' = 'zh'
 ): Promise<GenerationResult> => {
   const settings = getSettings();
   if (!settings.apiKey) throw new Error("AUTH_ERROR: 未配置 API Key。");
@@ -184,9 +225,9 @@ export const generateJewelryVariation = async (
         Requirements:
         - Keep the core composition and lighting of the input image similar unless asked to change.
         - Maintain photorealistic quality (8k, octane render).
-        - Output a short Chinese description of what was changed.
+        - Output a short ${lang === 'en' ? 'English' : 'Chinese'} description of what was changed.
       `;
-      fallbackDesc = `修改: ${refinePrompt}`;
+      fallbackDesc = lang === 'en' ? `Refine: ${refinePrompt}` : `修改: ${refinePrompt}`;
       break;
     case VariationMode.VIEWS:
       prompt = `
@@ -197,10 +238,10 @@ export const generateJewelryVariation = async (
         - Arrange them elegantly on a clean white or light grey background.
         - Maintain the exact materials (Metal, Gems) from the input image.
         - High resolution, sharp details for manufacturing reference.
-        - Output description: "三视图生成完毕"
+        - Output description: "3-View Technical Drawing"
       `;
       aspectRatio = "16:9";
-      fallbackDesc = "三视图";
+      fallbackDesc = lang === 'en' ? "3-Views" : "三视图";
       break;
     case VariationMode.MODEL:
       prompt = `
@@ -211,10 +252,10 @@ export const generateJewelryVariation = async (
         - Placement: Correct anatomical placement (e.g., ring on finger, necklace on neck).
         - Focus: Shallow depth of field, focus on the jewelry.
         - Lighting: Cinematic fashion lighting.
-        - Output description: "模特佩戴效果展示"
+        - Output description: "Model Fit"
       `;
       aspectRatio = "3:4";
-      fallbackDesc = "模特试戴";
+      fallbackDesc = lang === 'en' ? "On Model" : "模特试戴";
       break;
     case VariationMode.PHOTO:
       prompt = `
@@ -224,14 +265,13 @@ export const generateJewelryVariation = async (
         - Props: Place it on a textured surface (marble, silk, or slate) or a floating pedestal.
         - Lighting: Dramatic, high-contrast 'Rembrandt' lighting or ethereal 'Rim' lighting.
         - Atmosphere: Luxury, expensive, sophisticated.
-        - Output description: "商业摄影大片展示"
+        - Output description: "Editorial Shot"
       `;
       aspectRatio = "4:3";
-      fallbackDesc = "摄影大片";
+      fallbackDesc = lang === 'en' ? "Editorial" : "摄影大片";
       break;
   }
 
-  // Mock config for variation
   const variationConfig: any = {
     imageSize: '2K',
     aspectRatio: aspectRatio
@@ -250,7 +290,8 @@ export const generateJewelryVariation = async (
  */
 export const generateProductionSpecs = async (
   base64Image: string,
-  config: DesignConfig
+  config: DesignConfig,
+  lang: 'zh' | 'en' = 'zh'
 ): Promise<ProductionSpecs> => {
   const settings = getSettings();
   if (!settings.apiKey) throw new Error("AUTH_ERROR: 未配置 API Key。");
@@ -259,79 +300,92 @@ export const generateProductionSpecs = async (
   const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
   const cleanBase64 = base64Image.replace(/^data:image\/[a-zA-Z+]+;base64,/, '');
 
-  const dateStr = new Date().toLocaleDateString('zh-CN');
+  const dateStr = new Date().toLocaleDateString(lang === 'en' ? 'en-US' : 'zh-CN');
+
+  // --- MATERIAL LOGIC ---
+  const m = config.metal.toLowerCase();
+  const isPlatinum = m.includes('platinum') || m.includes('pt') || m.includes('铂金');
+  const isSilver = m.includes('silver') || m.includes('ag') || m.includes('银');
+  // Default to gold if not Pt or Ag
+  const isGold = !isPlatinum && !isSilver; 
+
+  let priceLogic = "";
+  if (isPlatinum) {
+     priceLogic = "Material identified as **Platinum (Pt950)**. Use base reference price: **380 CNY/g**. Density: ~21.45 g/cm³.";
+  } else if (isSilver) {
+     priceLogic = "Material identified as **Silver (Ag925)**. Use base reference price: **10 CNY/g**. Density: ~10.49 g/cm³.";
+  } else {
+     priceLogic = "Material identified as **Gold** (e.g. 18K/Au750). Use base reference price for Raw Gold (Au999): **1240 CNY/g**. Density: ~15.5 g/cm³ (18K).";
+  }
 
   const prompt = `
-    Role: Senior Jewelry Factory Manager (资深生产主管).
-    Task: Generate a professional "Jewelry Production Order" (生产工艺确认单).
+    Role: Senior Jewelry Factory Manager.
+    Task: Generate a professional "Jewelry Production Order" (Factory Sheet) in ${lang === 'en' ? 'English' : 'Simplified Chinese'}.
     
-    STRICT INSTRUCTION - FIXED PRICE (固定金价):
-    1.  **Gold Price**: Use a FIXED reference price of **1240 CNY/g** (User defined).
-    2.  **Do NOT** search for real-time prices.
+    STRICT MATERIAL & PRICING INSTRUCTION:
+    ${priceLogic}
     
     Calculation Logic (Cost Estimation):
-    - **Gold Price (Base)**: 1240 CNY/g.
     - **Material Cost**: 
-        - 18K Gold = (1240 * 0.75) * 1.15 (15% Loss/Markup).
-        - Platinum = 1240 * 1.15 (Estimate).
-        - Weight: Estimate based on visual volume (18K Density ~15.5g/cm³).
-    - **Labor Cost**: 350-1500 CNY depending on complexity.
-    - **Total**: Material + Labor + Side Stones.
+       - If Gold 18K: (1240 * 0.75) * 1.15 (Loss/Markup).
+       - If Platinum: 380 * 1.15.
+       - If Silver: 10 * 1.15.
+    - **Weight**: Estimate volume visually. Calculate weight = Volume * Density.
+    - **Labor Cost**: Estimate based on complexity (350-2000 CNY).
+    - **Total**: Material + Labor + Stones.
 
-    Input Context:
-    - Type: ${config.type}
-    - Metal: ${config.metal}
-    - Gemstone: ${config.gemstone}
+    Input Context (Note: Inputs may be in mixed languages, assume user wants output in ${lang === 'en' ? 'English' : 'Chinese'}):
+    - Type: ${translateInput(config.type, lang)}
+    - Metal: ${translateInput(config.metal, lang)}
+    - Gemstone: ${translateInput(config.gemstone, lang)}
+
+    ${lang === 'en' ? 'IMPORTANT: All generated text values (title, densityInfo, setting details, factoryNotes) MUST be in English.' : ''}
 
     Output JSON Schema (Strict):
     {
       "orderNo": "PO-${Date.now().toString().slice(-6)}",
-      "title": "简短技术命名",
+      "title": "Short Tech Name",
       "date": "${dateStr}",
       "measurements": {
-        "size": "参考尺寸 (e.g., 港度13#)",
+        "size": "Reference Size (e.g. US 6 / HK 13)",
         "dimensions": "L x W x H mm",
-        "thickness": "壁厚 mm"
+        "thickness": "Thickness mm"
       },
       "metal": {
-        "type": "成色 (e.g., Au750/18K)",
-        "estimatedWeight": "预估重 (e.g., 3.5g)",
+        "type": "Purity (e.g. Au750/18K)",
+        "estimatedWeight": "Est. Weight (e.g. 3.5g)",
         "lossRate": "15%",
-        "densityInfo": "基于 1240 金价核算"
+        "densityInfo": "Basis of calculation"
       },
       "gemstones": {
-        "main": { "name": "主石", "cut": "切工", "size": "尺寸", "qty": "1", "setting": "镶嵌" },
-        "side": [ { "type": "副石", "size": "尺寸", "qty": "数量", "setting": "镶嵌" } ]
+        "main": { "name": "Main Stone", "cut": "Cut", "size": "Size", "qty": "1", "setting": "Setting" },
+        "side": [ { "type": "Side Stone", "size": "Size", "qty": "Qty", "setting": "Setting" } ]
       },
       "craftsmanship": {
-        "surfaceProcess": ["工艺1", "工艺2"],
-        "structure": "结构",
-        "plating": "电镀"
+        "surfaceProcess": ["Process1", "Process2"],
+        "structure": "Structure",
+        "plating": "Plating"
       },
       "costEstimate": {
-        "goldPriceRef": "固定参考价: 1240 元/克",
-        "materialCost": "预估金料费",
-        "laborCost": "预估工费",
-        "stoneCostRef": "配石费",
-        "totalEstimate": "总计",
+        "goldPriceRef": "Ref Price Used (e.g. 1240 CNY/g)",
+        "materialCost": "Est. Metal Cost",
+        "laborCost": "Est. Labor",
+        "stoneCostRef": "Stone Cost",
+        "totalEstimate": "Total",
         "currency": "CNY"
       },
-      "factoryNotes": ["建议1", "建议2"]
+      "factoryNotes": ["Note1", "Note2"]
     }
   `;
 
-  // Use Flash 2.0 which supports Google Search for real-time data
   try {
-    // Disable tools for fixed price
-    const toolsConfig = {}; 
-    
     const result = await executeGeneration(
       settings.apiKey, 
       settings.baseUrl, 
       prompt, 
       cleanBase64, 
       mimeType, 
-      toolsConfig, // No tools
+      {}, 
       'gemini-2.0-flash', 
       'text'
     );
@@ -345,20 +399,19 @@ export const generateProductionSpecs = async (
     }
   } catch (e) {
     console.error("Specs generation error", e);
-    // Return a dummy fallback
     return {
       orderNo: `ERR-${Date.now()}`,
-      title: `${config.metal} ${config.type} (自动估算)`,
+      title: `${config.metal} ${config.type}`,
       date: dateStr,
-      measurements: { size: "待确认", dimensions: "-", thickness: "-" },
-      metal: { type: config.metal, estimatedWeight: "待确认", lossRate: "15%", densityInfo: "-" },
+      measurements: { size: "?", dimensions: "-", thickness: "-" },
+      metal: { type: config.metal, estimatedWeight: "?", lossRate: "15%", densityInfo: "-" },
       gemstones: { 
-          main: { name: config.gemstone, cut: "-", size: "-", qty: "1", setting: "待定" }, 
+          main: { name: config.gemstone, cut: "-", size: "-", qty: "1", setting: "-" }, 
           side: [] 
       },
-      craftsmanship: { surfaceProcess: ["镜面抛光"], structure: "一体", plating: "无" },
-      costEstimate: { goldPriceRef: "1240 (手动)", materialCost: "0", laborCost: "0", stoneCostRef: "0", totalEstimate: "核算中", currency: "CNY" },
-      factoryNotes: ["AI服务异常，无法核算，请手动核算。"]
+      craftsmanship: { surfaceProcess: ["-"], structure: "-", plating: "-" },
+      costEstimate: { goldPriceRef: "-", materialCost: "0", laborCost: "0", stoneCostRef: "0", totalEstimate: "Error", currency: "CNY" },
+      factoryNotes: ["AI Calculation Failed"]
     };
   }
 };
@@ -435,7 +488,6 @@ async function generateViaSDK(
     if (expectedType === 'image') {
         generationConfig.imageConfig = Object.keys(imgConfig).length > 0 ? imgConfig : undefined;
     }
-    // PASS TOOLS IF PRESENT (Google Search)
     if (config.tools) {
         generationConfig.tools = config.tools;
     }
@@ -514,14 +566,12 @@ async function generateViaProxy(
 
   const performFetch = async (targetModel: string, level: 'full' | 'no-size' = 'full') => {
     const url = `${baseUrl}/v1beta/models/${targetModel}:generateContent?key=${apiKey}`;
-    console.log(`Attempting generate with model: ${targetModel}`);
     
     const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        // 'Authorization': `Bearer ${apiKey}`, // Removed: Can conflict with key param in some proxies
-        'x-goog-api-key': apiKey // Added: Standard header for key-based auth
+        'x-goog-api-key': apiKey 
       },
       body: JSON.stringify(makePayload(targetModel, level))
     });
@@ -551,9 +601,6 @@ function isRetryable400(error: any) {
   return msg.includes('INVALID_ARGUMENT') || msg.includes('400');
 }
 
-/**
- * Robust parsing of response parts
- */
 function parseContentParts(response: any, expectedType: 'image' | 'text'): GenerationResult {
   let image = '';
   let description = '';
@@ -561,18 +608,13 @@ function parseContentParts(response: any, expectedType: 'image' | 'text'): Gener
   
   if (candidates && candidates[0]?.content?.parts) {
     for (const part of candidates[0].content.parts) {
-      // 1. Check for Inline Image
       if (part.inlineData && part.inlineData.data) {
         image = `data:image/png;base64,${part.inlineData.data}`;
-      }
-      // 2. Check for Text (which might contain markdown image)
-      else if (part.text) {
+      } else if (part.text) {
         const text = part.text;
-        // Check for Markdown Image embedded in text
         const imageMarkdownMatch = text.match(/!\[.*?\]\((data:image\/.*?;base64,.*?)\)/);
         if (imageMarkdownMatch && imageMarkdownMatch[1]) {
            image = imageMarkdownMatch[1];
-           // Remove the image string from description
            description += text.replace(imageMarkdownMatch[0], '');
         } else {
            description += text;
@@ -581,9 +623,8 @@ function parseContentParts(response: any, expectedType: 'image' | 'text'): Gener
     }
   }
 
-  // Final Validation based on Expectation
   if (expectedType === 'image' && !image) {
-    throw new Error("API 返回数据为空，未生成图片。");
+    throw new Error("API Returned no image data.");
   }
 
   return {
@@ -594,9 +635,9 @@ function parseContentParts(response: any, expectedType: 'image' | 'text'): Gener
 
 function handleError(error: any) {
   console.error("Gemini Error:", error);
-  let errorMessage = "生成设计时出现问题。";
-  if (error.message && error.message.includes("Failed to fetch")) errorMessage = "网络请求失败，请检查 Base URL。";
-  else if (error.message && (error.message.includes("401") || error.message.includes("403"))) errorMessage = "AUTH_ERROR: API Key 无效或过期。";
-  else if (error.message) errorMessage = `错误: ${error.message}`;
+  let errorMessage = "Generation failed.";
+  if (error.message && error.message.includes("Failed to fetch")) errorMessage = "Network error. Check Base URL.";
+  else if (error.message && (error.message.includes("401") || error.message.includes("403"))) errorMessage = "AUTH_ERROR: Invalid API Key.";
+  else if (error.message) errorMessage = `Error: ${error.message}`;
   throw new Error(errorMessage);
 }
